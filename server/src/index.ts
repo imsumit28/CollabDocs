@@ -52,12 +52,12 @@ app.get('/api/swagger/swagger.json', (_req, res) => {
 });
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/docs', documentRoutes);
-app.use('/api/versions', versionRoutes);
-app.use('/api/ai', aiRoutes);
-app.use('/api/export', exportRoutes);
-app.use('/api/comments', commentRoutes);
+app.use('/api/auth', authRoutes as any);
+app.use('/api/docs', documentRoutes as any);
+app.use('/api/versions', versionRoutes as any);
+app.use('/api/ai', aiRoutes as any);
+app.use('/api/export', exportRoutes as any);
+app.use('/api/comments', commentRoutes as any);
 
 // 404 handler
 app.use((_req, res) => {

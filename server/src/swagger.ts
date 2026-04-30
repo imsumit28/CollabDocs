@@ -1,4 +1,4 @@
-import swaggerJsdoc from 'swagger-jsdoc';
+const swaggerJsdoc: any = require('swagger-jsdoc');
 import path from 'path';
 
 const swaggerOptions = {
