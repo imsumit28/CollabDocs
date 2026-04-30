@@ -1,9 +1,9 @@
 'use client';
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../contexts/AuthContext';
 
-export default function OAuthCallbackPage() {
+function OAuthCallbackInner() {
   const { completeOAuthLogin } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,5 +24,13 @@ export default function OAuthCallbackPage() {
         <p className="text-gray-500">Signing you in…</p>
       </div>
     </div>
+  );
+}
+
+export default function OAuthCallbackPage() {
+  return (
+    <Suspense>
+      <OAuthCallbackInner />
+    </Suspense>
   );
 }
