@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Background -->
+  <rect width="32" height="32" rx="7" fill="#0D1B4B"/>
+  <!-- Document body -->
+  <rect x="9" y="5" width="13" height="17" rx="1.5" fill="url(#docGrad)"/>
+  <!-- Folded corner -->
+  <path d="M18 5 L22 9 L18 9 Z" fill="#0D1B4B" opacity="0.4"/>
+  <path d="M18 5 L22 9 L18 9" fill="none" stroke="#60A5FA" stroke-width="0.5"/>
+  <!-- Text lines on doc -->
+  <rect x="11" y="12" width="7" height="1.2" rx="0.6" fill="white" opacity="0.85"/>
+  <rect x="11" y="15" width="5.5" height="1.2" rx="0.6" fill="white" opacity="0.6"/>
+  <rect x="11" y="18" width="6.5" height="1.2" rx="0.6" fill="white" opacity="0.4"/>
+  <!-- Collaboration nodes -->
+  <circle cx="6.5" cy="9" r="2.8" fill="#5856D6"/>
+  <circle cx="6.5" cy="9" r="1.4" fill="white" opacity="0.9"/>
+  <circle cx="25.5" cy="13" r="2.8" fill="#007AFF"/>
+  <circle cx="25.5" cy="13" r="1.4" fill="white" opacity="0.9"/>
+  <circle cx="6.5" cy="25" r="2.8" fill="#AF52DE"/>
+  <circle cx="6.5" cy="25" r="1.4" fill="white" opacity="0.9"/>
+  <!-- Connecting lines -->
+  <line x1="9" y1="10" x2="9" y2="11" stroke="#60A5FA" stroke-width="0.8" opacity="0.6"/>
+  <line x1="22" y1="12" x2="22.5" y2="13" stroke="#60A5FA" stroke-width="0.8" opacity="0.6"/>
+  <line x1="9" y1="22" x2="9" y2="21" stroke="#AF52DE" stroke-width="0.8" opacity="0.6"/>
+  <defs>
+    <linearGradient id="docGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+  </defs>
+</svg>
