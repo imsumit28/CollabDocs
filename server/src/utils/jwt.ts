@@ -36,10 +36,11 @@ export function verifyRefreshToken(token: string): RefreshTokenPayload {
 }
 
 export function setRefreshCookie(res: import('express').Response, token: string): void {
+  const isProd = process.env.NODE_ENV === 'production';
   res.cookie('refreshToken', token, {
     httpOnly: true,
-    sameSite: 'strict',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: isProd ? 'none' : 'strict',
+    secure: isProd,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: '/api/auth/refresh',
   });
