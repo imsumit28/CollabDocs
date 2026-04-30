@@ -1,19 +1,21 @@
 'use client';
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../contexts/AuthContext';
 
 export default function OAuthCallbackPage() {
   const { completeOAuthLogin } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     (async () => {
-      const ok = await completeOAuthLogin();
+      const token = searchParams.get('token') ?? undefined;
+      const ok = await completeOAuthLogin(token);
       if (ok) router.replace('/dashboard');
       else router.replace('/login?error=oauth');
     })();
-  }, [router, completeOAuthLogin]);
+  }, [router, completeOAuthLogin, searchParams]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">

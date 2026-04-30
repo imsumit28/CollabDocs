@@ -267,12 +267,11 @@ router.get(
   '/google/callback',
   passport.authenticate('google', { session: false, failureRedirect: `${process.env.CLIENT_URL}/login?error=oauth` }),
   (req: Request, res: Response) => {
-    console.log('[auth/google/callback] OAuth success, user:', (req.user as IUser)?.email);
     const user = req.user as IUser;
+    const accessToken = signAccessToken({ sub: user.id, email: user.email, displayName: user.displayName });
     const refreshToken = signRefreshToken({ sub: user.id, tokenVersion: user.tokenVersion });
     setRefreshCookie(res, refreshToken);
-    console.log('[auth/google/callback] Refresh cookie set, redirecting to:', `${process.env.CLIENT_URL}/auth/callback`);
-    res.redirect(`${process.env.CLIENT_URL}/auth/callback`);
+    res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${accessToken}`);
   }
 );
 
