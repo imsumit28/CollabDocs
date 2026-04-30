@@ -119,7 +119,9 @@ export function initSocket(server: HTTPServer): SocketServer {
         // Initialise Y.Doc for this room
         if (!docRooms.has(docId)) {
           const ydoc = new Y.Doc();
-          if (dbDoc.yjsState) Y.applyUpdate(ydoc, new Uint8Array(dbDoc.yjsState));
+          // Re-read yjsState fresh to avoid race condition with concurrent flushAndClean
+          const freshDoc = await CollabDocument.findById(docId, 'yjsState');
+          if (freshDoc?.yjsState) Y.applyUpdate(ydoc, new Uint8Array(freshDoc.yjsState));
           docRooms.set(docId, { doc: ydoc, io, saveTimer: null, lastHash: '' });
         }
 
@@ -148,7 +150,7 @@ export function initSocket(server: HTTPServer): SocketServer {
         const state = Y.encodeStateAsUpdate(room.doc);
         await CollabDocument.findByIdAndUpdate(docId, { yjsState: Buffer.from(state) });
         io.to(docId).emit('doc:saved', { timestamp: new Date().toISOString() });
-      }, 5000);
+      }, 1500);
     });
 
     // ─── Cursor broadcast ──────────────────────────────────────────────────────
