@@ -16,7 +16,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
-  completeOAuthLogin: () => Promise<boolean>;
+  completeOAuthLogin: (accessToken?: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -68,12 +68,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = '/login';
   }, []);
 
-  const completeOAuthLogin = useCallback(async () => {
+  const completeOAuthLogin = useCallback(async (accessToken?: string) => {
     try {
-      const res = await api.post('/auth/refresh');
-      const { accessToken } = res.data;
-      setToken(accessToken);
-      api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+      const token = accessToken ?? (await api.post('/auth/refresh')).data.accessToken;
+      setToken(token);
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       const meRes = await api.get('/auth/me');
       setUser(meRes.data);
       return true;
