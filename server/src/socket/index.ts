@@ -1,7 +1,7 @@
 import { Server as HTTPServer } from 'http';
 import { Server as SocketServer, Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
-import { createClient } from 'ioredis';
+import Redis from 'ioredis';
 import { verifyAccessToken } from '../utils/jwt';
 import { CollabDocument } from '../models';
 import * as Y from 'yjs';
@@ -28,15 +28,15 @@ function userColor(userId: string): string {
 }
 
 // Deduplicate by user ID so the same person in two tabs counts as one
-function dedupeUsers(sockets: Awaited<ReturnType<SocketServer['in']>['fetchSockets']>) {
+function dedupeUsers(sockets: any[]) {
   const seen = new Set<string>();
   return sockets
-    .filter((s) => {
+    .filter((s: any) => {
       if (seen.has(s.data.user.sub)) return false;
       seen.add(s.data.user.sub);
       return true;
     })
-    .map((s) => ({
+    .map((s: any) => ({
       id: s.data.user.sub,
       displayName: s.data.user.displayName,
       color: userColor(s.data.user.sub),
@@ -62,7 +62,7 @@ export function initSocket(server: HTTPServer): SocketServer {
   // Redis adapter for horizontal scaling (optional)
   if (process.env.REDIS_URL) {
     try {
-      const pub = createClient(process.env.REDIS_URL, {
+      const pub = new Redis(process.env.REDIS_URL, {
         lazyConnect: true,
         enableOfflineQueue: false,
         maxRetriesPerRequest: 0,
