@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useEditor, EditorContent, ReactRenderer, BubbleMenu } from '@tiptap/react';
 import { Mark, mergeAttributes } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -1100,6 +1101,7 @@ function PresenceBar({ onlineUsers, typingUsers }: { onlineUsers: any[]; typingU
 
 export default function Editor({ docId }: { docId: string }) {
   const { user, token } = useAuth();
+  const router = useRouter();
   const toast = useToast();
   const [title, setTitle] = useState('Untitled');
   const [saving, setSaving] = useState(false);
@@ -1379,12 +1381,12 @@ export default function Editor({ docId }: { docId: string }) {
       {/* Header */}
       <div className="apple-glass border-b border-[rgba(0,0,0,0.08)] sticky top-0 z-10">
         <div className="flex items-center gap-3 px-4 py-2.5">
-          <a href="/dashboard" className="flex items-center gap-1.5 text-[#007AFF] hover:text-[#0055D4] text-[13px] font-semibold transition-colors flex-shrink-0">
+          <button type="button" onClick={() => router.push('/dashboard')} className="flex items-center gap-1.5 text-[#007AFF] hover:text-[#0055D4] text-[13px] font-semibold transition-colors flex-shrink-0">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
             </svg>
             Docs
-          </a>
+          </button>
           <div className="w-px h-4 bg-[rgba(0,0,0,0.12)]" />
           <input
             value={title}

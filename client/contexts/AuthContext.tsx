@@ -26,18 +26,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Try to refresh token on mount
+  // Try to restore session on mount
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.post('/auth/refresh');
-        const { accessToken } = res.data;
+        const stored = sessionStorage.getItem('accessToken');
+        const accessToken = stored ?? (await api.post('/auth/refresh')).data.accessToken;
+        if (!stored) sessionStorage.setItem('accessToken', accessToken);
         setToken(accessToken);
         api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
         const meRes = await api.get('/auth/me');
         setUser(meRes.data);
       } catch {
-        // Not logged in
+        sessionStorage.removeItem('accessToken');
       } finally {
         setLoading(false);
       }
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { accessToken, user: userData } = res.data;
     setToken(accessToken);
     setUser(userData);
+    sessionStorage.setItem('accessToken', accessToken);
     api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
   }, []);
 
@@ -64,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await api.post('/auth/logout').catch(() => {});
     setToken(null);
     setUser(null);
+    sessionStorage.removeItem('accessToken');
     delete api.defaults.headers.common['Authorization'];
     window.location.href = '/login';
   }, []);
@@ -72,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const token = accessToken ?? (await api.post('/auth/refresh')).data.accessToken;
       setToken(token);
+      sessionStorage.setItem('accessToken', token);
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       const meRes = await api.get('/auth/me');
       setUser(meRes.data);
