@@ -8,7 +8,7 @@
 
 > A real-time collaborative document editor built from scratch — think Google Docs with AI writing assistance, live cursors, and version history. Built with Next.js, Node.js, Socket.IO, Y.js CRDT, and Groq AI.
 
-**Live Demo: Coming Soon** · **[GitHub](https://github.com/yourusername/collabdocs)**
+**Live Demo: [collabdocs2026.vercel.app](https://collabdocs2026.vercel.app)** · **[GitHub](https://github.com/imsumit28/CollabDocs)**
 
 ---
 
