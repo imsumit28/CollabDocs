@@ -409,7 +409,7 @@ This project showcases understanding of:
 - **Frontend**: Deploy `/client` to Vercel via GitHub integration. Set `NEXT_PUBLIC_API_URL` in Vercel dashboard.
 - **Backend**: Deploy `/server` to Render. Connect your GitHub repo, set root directory to `server`, add all backend env vars.
 
-See the [Task Breakdown](docs/CollabDocs_Tasks.docx) for step-by-step deployment instructions.
+📋 **See [Task Breakdown](./task_breakdown.md#11-deployment--devops)** for detailed step-by-step deployment instructions, infrastructure setup, and CI/CD configuration.
 
 ---
 
