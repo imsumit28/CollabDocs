@@ -60,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | Cache | Upstash Redis (@socket.io/redis-adapter) |
 | Auth | JWT (HS256), Google OAuth (Passport.js) |
 | AI | Groq API (Llama 3.3 70B) |
-| Deployment | Vercel (frontend), Railway (backend) |
+| Deployment | Vercel (frontend), Render (backend) |
 
 ---
 

@@ -196,13 +196,13 @@ git push origin main
 # 3. Set env var: NEXT_PUBLIC_API_URL=https://api.collabdocs.app
 ```
 
-### Backend (Railway)
+### Backend (Render)
 ```bash
-# 1. Create Railway project
+# 1. Create Render service
 # 2. Connect GitHub repo
 # 3. Set root directory: server
 # 4. Add all env variables (MONGODB_URI, JWT_*, etc.)
-# 5. Railway auto-deploys on git push
+# 5. Render auto-deploys on git push
 ```
 
 See [README.md](README.md) for detailed deployment steps.

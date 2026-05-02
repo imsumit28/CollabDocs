@@ -48,7 +48,7 @@
 | **Auth** | JWT (HS256), Google OAuth (Passport.js) |
 | **Cache/Scale** | Redis (Upstash), @socket.io/redis-adapter |
 | **AI** | Groq API — Llama 3.3 70B (free tier) |
-| **Hosting** | Vercel (frontend) + Railway (backend) |
+| **Hosting** | Vercel (frontend) + Render (backend) |
 
 ---
 
@@ -407,7 +407,7 @@ This project showcases understanding of:
 ## Deployment
 
 - **Frontend**: Deploy `/client` to Vercel via GitHub integration. Set `NEXT_PUBLIC_API_URL` in Vercel dashboard.
-- **Backend**: Deploy `/server` to Railway. Connect your GitHub repo, set root directory to `server`, add all backend env vars.
+- **Backend**: Deploy `/server` to Render. Connect your GitHub repo, set root directory to `server`, add all backend env vars.
 
 See the [Task Breakdown](docs/CollabDocs_Tasks.docx) for step-by-step deployment instructions.
 
