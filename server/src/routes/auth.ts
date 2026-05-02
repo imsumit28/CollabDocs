@@ -266,7 +266,7 @@ router.get('/google', passport.authenticate('google', { scope: ['profile', 'emai
 router.get(
   '/google/callback',
   passport.authenticate('google', { session: false, failureRedirect: `${process.env.CLIENT_URL}/login?error=oauth` }),
-  (req: Request, res: Response) => {
+  (req: AuthRequest, res: Response) => {
     const user = req.user as IUser;
     const accessToken = signAccessToken({ sub: user.id, email: user.email, displayName: user.displayName });
     const refreshToken = signRefreshToken({ sub: user.id, tokenVersion: user.tokenVersion });
