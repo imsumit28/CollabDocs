@@ -237,7 +237,7 @@ export default function TermsPage() {
             <section>
               <h3 className="text-[16px] font-semibold text-[#111827] mb-2">5. Data Storage</h3>
               <p className="text-[14px] text-[#4B5563] leading-relaxed">
-                Your data is stored on servers used to host this student project (such as cloud providers like Vercel, Railway, or similar platforms). We take reasonable steps to keep your data secure, but as a student project, we cannot guarantee enterprise-level security. Please do not store highly sensitive personal information on CollabDocs.
+                Your data is stored on servers used to host this student project (such as cloud providers like Vercel, Render, or similar platforms). We take reasonable steps to keep your data secure, but as a student project, we cannot guarantee enterprise-level security. Please do not store highly sensitive personal information on CollabDocs.
               </p>
             </section>
 
