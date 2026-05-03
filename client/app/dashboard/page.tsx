@@ -244,7 +244,8 @@ function ContextMenu({
   onDuplicate: () => void; onVersionHistory: () => void; onExport: (fmt: 'pdf' | 'docx') => void;
   onInfo: () => void; onDelete: () => void; onClose: () => void;
 }) {
-  const menuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const desktopMenuRef = useRef<HTMLDivElement>(null);
   const [exportOpen, setExportOpen] = useState(false);
   // Start below the button; useLayoutEffect will flip up if it overflows
   const [style, setStyle] = useState<React.CSSProperties>({
@@ -257,15 +258,18 @@ function ContextMenu({
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
+      const target = e.target as Node;
+      const insideMobile = mobileMenuRef.current?.contains(target);
+      const insideDesktop = desktopMenuRef.current?.contains(target);
+      if (!insideMobile && !insideDesktop) onClose();
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
   useLayoutEffect(() => {
-    if (!menuRef.current) return;
-    const rect = menuRef.current.getBoundingClientRect();
+    if (!desktopMenuRef.current) return;
+    const rect = desktopMenuRef.current.getBoundingClientRect();
     const top = anchor.bottom + 4 + rect.height > window.innerHeight - 8
       ? Math.max(8, anchor.top - rect.height - 4)
       : anchor.bottom + 4;
@@ -351,7 +355,7 @@ function ContextMenu({
       <div className="md:hidden fixed inset-0 z-50">
         <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
         <div
-          ref={menuRef}
+          ref={mobileMenuRef}
           className="absolute bottom-3 left-3 right-3 bg-white rounded-[24px] pb-6 pt-2 shadow-apple-xl anim-slide-up max-h-[70vh] overflow-y-auto"
         >
           {/* Handle bar */}
@@ -365,7 +369,7 @@ function ContextMenu({
       {/* Desktop: portal dropdown with smart flip */}
       {createPortal(
         <div
-          ref={menuRef}
+          ref={desktopMenuRef}
           style={style}
           className="hidden md:block w-52 bg-white rounded-[14px] shadow-apple-lg border border-[rgba(0,0,0,0.08)] py-1.5 anim-scale-in origin-top-right"
         >
