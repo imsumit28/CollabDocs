@@ -318,8 +318,15 @@ function ContextMenu({
 
       {/* Group 4 */}
       <div>
-        <Item icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>}
-          label="Export" onClick={() => setExportOpen((v) => !v)} />
+        <button type="button"
+          onClick={() => setExportOpen((v) => !v)}
+          className={`flex items-center gap-2.5 w-full px-4 py-2.5 text-[14px] font-medium transition-colors text-left rounded-md text-[#1D1D1F] hover:bg-[#F5F5F7] active:bg-[#EBEBEF]`}
+        >
+          <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+          </span>
+          Export {exportOpen && '▼'}
+        </button>
         {exportOpen && (
           <div className="ml-3 border-l-2 border-[#2563EB]/20 pl-2 mb-1">
             <button type="button" onClick={() => { onExport('pdf'); onClose(); }}
@@ -346,11 +353,13 @@ function ContextMenu({
         <div
           ref={menuRef}
           onClick={(e) => e.stopPropagation()}
-          className="absolute bottom-3 left-3 right-3 bg-white rounded-[24px] pb-6 pt-2 shadow-apple-xl anim-slide-up"
+          className="absolute bottom-3 left-3 right-3 bg-white rounded-[24px] pb-6 pt-2 shadow-apple-xl anim-slide-up max-h-[70vh] overflow-y-auto"
         >
           {/* Handle bar */}
           <div className="w-10 h-1 bg-[rgba(0,0,0,0.15)] rounded-full mx-auto mb-3" />
-          {menuContent}
+          <div className="px-2">
+            {menuContent}
+          </div>
         </div>
       </div>
 
