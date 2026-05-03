@@ -348,11 +348,10 @@ function ContextMenu({
   return (
     <>
       {/* Mobile: full-screen bottom sheet */}
-      <div className="md:hidden fixed inset-0 z-50" onClick={onClose}>
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+      <div className="md:hidden fixed inset-0 z-50">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
         <div
           ref={menuRef}
-          onClick={(e) => e.stopPropagation()}
           className="absolute bottom-3 left-3 right-3 bg-white rounded-[24px] pb-6 pt-2 shadow-apple-xl anim-slide-up max-h-[70vh] overflow-y-auto"
         >
           {/* Handle bar */}
