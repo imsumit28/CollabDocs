@@ -282,8 +282,8 @@ function ContextMenu({
     icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean; disabled?: boolean;
   }) => (
     <button type="button" onClick={onClick} disabled={disabled}
-      className={`flex items-center gap-2.5 w-full px-4 py-2.5 text-[14px] font-medium transition-colors text-left
-        ${danger ? 'text-[#FF3B30] hover:bg-[#FFF2F1]' : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'}
+      className={`flex items-center gap-2.5 w-full px-4 py-2.5 text-[14px] font-medium transition-colors text-left rounded-md
+        ${danger ? 'text-[#FF3B30] hover:bg-[#FFF2F1] active:bg-[#FFE8E6]' : 'text-[#1D1D1F] hover:bg-[#F5F5F7] active:bg-[#EBEBEF]'}
         ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
       <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">{icon}</span>
       {label}
@@ -323,11 +323,11 @@ function ContextMenu({
         {exportOpen && (
           <div className="ml-3 border-l-2 border-[#2563EB]/20 pl-2 mb-1">
             <button type="button" onClick={() => { onExport('pdf'); onClose(); }}
-              className="flex items-center gap-2 w-full px-3 py-1.5 text-[12px] text-[#1D1D1F] hover:bg-[#F5F5F7] rounded-lg">
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-[12px] text-[#1D1D1F] hover:bg-[#F5F5F7] active:bg-[#E8E8ED] rounded-lg transition-colors">
               <span className="text-[10px] font-bold bg-[#FF3B30] text-white px-1 rounded">PDF</span> Export as PDF
             </button>
             <button type="button" onClick={() => { onExport('docx'); onClose(); }}
-              className="flex items-center gap-2 w-full px-3 py-1.5 text-[12px] text-[#1D1D1F] hover:bg-[#F5F5F7] rounded-lg">
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-[12px] text-[#1D1D1F] hover:bg-[#F5F5F7] active:bg-[#E8E8ED] rounded-lg transition-colors">
               <span className="text-[10px] font-bold bg-[#2563EB] text-white px-1 rounded">DOC</span> Export as DOCX
             </button>
           </div>
