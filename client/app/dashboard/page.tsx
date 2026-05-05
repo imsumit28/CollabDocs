@@ -1204,6 +1204,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const toast = useToast();
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const profileMenuPortalRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -1367,7 +1368,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const clickedTrigger = profileMenuRef.current?.contains(target);
+      const clickedPortal = profileMenuPortalRef.current?.contains(target);
+      if (!clickedTrigger && !clickedPortal) {
         setProfileMenuOpen(false);
       }
     };
@@ -1579,7 +1583,7 @@ export default function DashboardPage() {
                       className="fixed inset-0 bg-black/20 backdrop-blur-[1px] z-40"
                       onClick={() => setProfileMenuOpen(false)}
                     />
-                    <div className="fixed left-0 right-0 bottom-0 w-full bg-white border border-[rgba(0,0,0,0.08)] shadow-lg rounded-t-2xl p-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] z-50">
+                    <div ref={profileMenuPortalRef} className="fixed left-0 right-0 bottom-0 w-full bg-white border border-[rgba(0,0,0,0.08)] shadow-lg rounded-t-2xl p-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] z-50">
                       <div className="w-10 h-1 bg-[#D1D5DB] rounded-full mx-auto my-2" />
                       <div className="px-3 py-2 border-b border-[rgba(0,0,0,0.06)]">
                         <p className="text-[11px] text-[#8E8E93]">Username</p>
