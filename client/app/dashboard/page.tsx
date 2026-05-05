@@ -1561,46 +1561,53 @@ export default function DashboardPage() {
             </div>
 
             {user?.displayName && (
-              <div ref={profileMenuRef} className="hidden sm:block relative">
+              <div ref={profileMenuRef} className="block relative">
                 <button
                   type="button"
                   onClick={() => setProfileMenuOpen((prev) => !prev)}
-                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-[#F4F4F5] transition-colors"
+                  className="flex items-center gap-2 rounded-lg px-1.5 sm:px-2 py-1.5 hover:bg-[#F4F4F5] transition-colors"
                 >
                   <div className="w-6 h-6 rounded-full bg-[#2563EB] flex items-center justify-center text-white text-[11px] font-bold">
                     {user.displayName[0].toUpperCase()}
                   </div>
-                  <span className="text-sm text-[#6E6E73] font-medium">{user.displayName}</span>
+                  <span className="hidden sm:inline text-sm text-[#6E6E73] font-medium">{user.displayName}</span>
                 </button>
 
                 {profileMenuOpen && (
-                  <div className="absolute right-0 top-[calc(100%+8px)] w-56 bg-white border border-[rgba(0,0,0,0.08)] shadow-lg rounded-xl p-1.5 z-50">
-                    <div className="px-3 py-2 border-b border-[rgba(0,0,0,0.06)]">
-                      <p className="text-[11px] text-[#8E8E93]">Username</p>
-                      <p className="text-sm font-semibold text-[#1D1D1F] truncate">{usernameHandle}</p>
+                  <>
+                    <div
+                      className="fixed inset-0 bg-black/20 backdrop-blur-[1px] z-40 sm:hidden"
+                      onClick={() => setProfileMenuOpen(false)}
+                    />
+                    <div className="fixed sm:absolute left-0 right-0 sm:left-auto sm:right-0 bottom-0 sm:bottom-auto sm:top-[calc(100%+8px)] w-full sm:w-56 bg-white border border-[rgba(0,0,0,0.08)] shadow-lg rounded-t-2xl sm:rounded-xl p-1.5 z-50">
+                      <div className="sm:hidden w-10 h-1 bg-[#D1D5DB] rounded-full mx-auto my-2" />
+                      <div className="px-3 py-2 border-b border-[rgba(0,0,0,0.06)]">
+                        <p className="text-[11px] text-[#8E8E93]">Username</p>
+                        <p className="text-sm font-semibold text-[#1D1D1F] truncate">{usernameHandle}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setProfileMenuOpen(false); toast.info('Profile page can be added here.'); }}
+                        className="w-full text-left px-3 py-2 text-sm text-[#1D1D1F] hover:bg-[#F4F4F5] rounded-lg transition-colors"
+                      >
+                        My Profile
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setProfileMenuOpen(false); toast.info('Account settings can be added here.'); }}
+                        className="w-full text-left px-3 py-2 text-sm text-[#1D1D1F] hover:bg-[#F4F4F5] rounded-lg transition-colors"
+                      >
+                        Account Settings
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setProfileMenuOpen(false); logout(); }}
+                        className="w-full text-left px-3 py-2 text-sm text-[#D92D20] hover:bg-[#FFF1F0] rounded-lg transition-colors"
+                      >
+                        Sign out
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => { setProfileMenuOpen(false); toast.info('Profile page can be added here.'); }}
-                      className="w-full text-left px-3 py-2 text-sm text-[#1D1D1F] hover:bg-[#F4F4F5] rounded-lg transition-colors"
-                    >
-                      My Profile
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setProfileMenuOpen(false); toast.info('Account settings can be added here.'); }}
-                      className="w-full text-left px-3 py-2 text-sm text-[#1D1D1F] hover:bg-[#F4F4F5] rounded-lg transition-colors"
-                    >
-                      Account Settings
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setProfileMenuOpen(false); logout(); }}
-                      className="w-full text-left px-3 py-2 text-sm text-[#D92D20] hover:bg-[#FFF1F0] rounded-lg transition-colors"
-                    >
-                      Sign out
-                    </button>
-                  </div>
+                  </>
                 )}
               </div>
             )}
