@@ -1407,8 +1407,10 @@ export default function Editor({ docId }: { docId: string }) {
           onRejectAll={rejectAllSuggestions}
           onlineUsers={onlineUsers}
         />
-        <PresenceBar onlineUsers={onlineUsers} typingUsers={typingUsers} />
       </div>
+
+      {/* Presence bar — outside the sticky header so nothing clips it */}
+      <PresenceBar onlineUsers={onlineUsers} typingUsers={typingUsers} />
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
