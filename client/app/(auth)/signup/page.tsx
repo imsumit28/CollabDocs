@@ -372,6 +372,7 @@ export default function SignupPage() {
 
   const [step, setStep] = useState<Step>(1);
   const [displayName, setDisplayName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -392,7 +393,7 @@ export default function SignupPage() {
     setError('');
     setLoading(true);
     try {
-      await signup(email, password, displayName);
+      await signup(email, password, displayName, username);
       setStep(2);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Signup failed. Please try again.');
@@ -486,6 +487,18 @@ export default function SignupPage() {
                     placeholder="you@example.com"
                     className={inputClass}
                   />
+                </div>
+                <div>
+                  <label className="block text-[13px] font-semibold text-[#374151] mb-1.5">Username</label>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    autoComplete="username"
+                    placeholder="@sumit_kumar"
+                    className={inputClass}
+                  />
+                  <p className="mt-1.5 text-[12px] text-[#94A3B8]">This username will be shown on your live editor cursor.</p>
                 </div>
                 <div>
                   <label className="block text-[13px] font-semibold text-[#374151] mb-1.5">Password</label>

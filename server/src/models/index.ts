@@ -7,6 +7,7 @@ export interface IUser extends MongoDoc {
   oauthProvider: 'google' | null;
   oauthId: string | null;
   displayName: string;
+  username: string | null;
   avatarUrl: string | null;
   emailVerified: boolean;
   emailVerificationToken: string | null;
@@ -23,6 +24,7 @@ const UserSchema = new Schema<IUser>(
     oauthProvider: { type: String, enum: ['google', null], default: null },
     oauthId: { type: String, default: null },
     displayName: { type: String, required: true, trim: true },
+    username: { type: String, default: null, trim: true },
     avatarUrl: { type: String, default: null },
     emailVerified: { type: Boolean, default: false },
     emailVerificationToken: { type: String, default: null, index: true },

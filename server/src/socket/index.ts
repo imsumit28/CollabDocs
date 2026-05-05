@@ -38,6 +38,7 @@ function dedupeUsers(sockets: any[]) {
     })
     .map((s: any) => ({
       id: s.data.user.sub,
+      username: s.data.user.username || null,
       displayName: s.data.user.displayName,
       color: userColor(s.data.user.sub),
     }));

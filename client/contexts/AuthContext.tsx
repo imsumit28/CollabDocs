@@ -6,6 +6,7 @@ interface User {
   id: string;
   email: string;
   displayName: string;
+  username?: string | null;
   avatarUrl?: string | null;
 }
 
@@ -14,7 +15,7 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, displayName: string) => Promise<void>;
+  signup: (email: string, password: string, displayName: string, username?: string) => Promise<void>;
   logout: () => Promise<void>;
   completeOAuthLogin: (accessToken?: string) => Promise<boolean>;
 }
@@ -54,8 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
   }, []);
 
-  const signup = useCallback(async (email: string, password: string, displayName: string) => {
-    const res = await api.post('/auth/signup', { email, password, displayName });
+  const signup = useCallback(async (email: string, password: string, displayName: string, username?: string) => {
+    const res = await api.post('/auth/signup', { email, password, displayName, username });
     const { accessToken, user: userData } = res.data;
     setToken(accessToken);
     setUser(userData);
