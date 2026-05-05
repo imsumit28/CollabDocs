@@ -164,6 +164,11 @@ export function initSocket(server: HTTPServer): SocketServer {
       });
     });
 
+    // ─── Y.js awareness relay (live cursors via y-protocols) ───────────────────
+    socket.on('awareness:update', ({ docId, update }: { docId: string; update: string }) => {
+      socket.to(docId).emit('awareness:update', { update });
+    });
+
     // ─── Typing indicator ─────────────────────────────────────────────────────
     socket.on('doc:typing', ({ docId }: { docId: string }) => {
       socket.to(docId).emit('doc:typing', {
