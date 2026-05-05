@@ -4,6 +4,7 @@ export interface AccessTokenPayload {
   sub: string;
   email: string;
   displayName: string;
+  username?: string | null;
 }
 
 export interface RefreshTokenPayload {

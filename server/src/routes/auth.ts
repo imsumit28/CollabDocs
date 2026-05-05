@@ -27,6 +27,17 @@ dotenv.config(envPath ? { path: envPath, override: true } : { override: true });
 
 const router = Router();
 
+function normalizeUsername(value?: string): string | null {
+  if (!value) return null;
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/^@+/, '')
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return normalized || null;
+}
+
 // ─── Passport Google Setup ────────────────────────────────────────────────────
 passport.use(
   new GoogleStrategy(
@@ -50,6 +61,7 @@ passport.use(
             oauthProvider: 'google',
             oauthId: profile.id,
             displayName: profile.displayName || email.split('@')[0],
+            username: normalizeUsername(email.split('@')[0]),
             avatarUrl: profile.photos?.[0].value || null,
             emailVerified: true, // Google already verified this address
           });
@@ -71,7 +83,7 @@ passport.use(
 // ─── Email / Password ─────────────────────────────────────────────────────────
 router.post('/signup', signupRateLimit, async (req: Request, res: Response) => {
   try {
-    const { email, password, displayName } = req.body;
+    const { email, password, displayName, username } = req.body;
     if (!email || !password || !displayName) {
       res.status(400).json({ error: 'email, password, and displayName are required' });
       return;
@@ -97,6 +109,7 @@ router.post('/signup', signupRateLimit, async (req: Request, res: Response) => {
       email,
       passwordHash,
       displayName,
+      username: normalizeUsername(username),
       oauthProvider: null,
       oauthId: null,
       emailVerificationToken: hashedToken,
@@ -106,13 +119,13 @@ router.post('/signup', signupRateLimit, async (req: Request, res: Response) => {
 
     sendVerificationEmail(user.email, rawToken).catch(() => {});
 
-    const accessToken = signAccessToken({ sub: user.id, email: user.email, displayName: user.displayName });
+    const accessToken = signAccessToken({ sub: user.id, email: user.email, displayName: user.displayName, username: user.username });
     const refreshToken = signRefreshToken({ sub: user.id, tokenVersion: user.tokenVersion });
     setRefreshCookie(res, refreshToken);
 
     res.status(201).json({
       accessToken,
-      user: { id: user.id, email: user.email, displayName: user.displayName, emailVerified: false },
+      user: { id: user.id, email: user.email, displayName: user.displayName, username: user.username, emailVerified: false },
     });
   } catch (err) {
     res.status(500).json({ error: 'Signup failed' });
@@ -139,13 +152,13 @@ router.post('/login', authRateLimit, async (req: Request, res: Response) => {
       return;
     }
 
-    const accessToken = signAccessToken({ sub: user.id, email: user.email, displayName: user.displayName });
+    const accessToken = signAccessToken({ sub: user.id, email: user.email, displayName: user.displayName, username: user.username });
     const refreshToken = signRefreshToken({ sub: user.id, tokenVersion: user.tokenVersion });
     setRefreshCookie(res, refreshToken);
 
     res.json({
       accessToken,
-      user: { id: user.id, email: user.email, displayName: user.displayName, avatarUrl: user.avatarUrl, emailVerified: user.emailVerified },
+      user: { id: user.id, email: user.email, displayName: user.displayName, username: user.username, avatarUrl: user.avatarUrl, emailVerified: user.emailVerified },
     });
   } catch (err) {
     res.status(500).json({ error: 'Login failed' });
@@ -173,7 +186,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
       return;
     }
 
-    const accessToken = signAccessToken({ sub: user.id, email: user.email, displayName: user.displayName });
+    const accessToken = signAccessToken({ sub: user.id, email: user.email, displayName: user.displayName, username: user.username });
     res.json({ accessToken });
   } catch {
     res.status(401).json({ error: 'Invalid refresh token' });
@@ -207,6 +220,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
     id: user.id,
     email: user.email,
     displayName: user.displayName,
+    username: user.username ?? null,
     avatarUrl: user.avatarUrl ?? null,
     emailVerified: user.emailVerified,
   });
@@ -268,7 +282,7 @@ router.get(
   passport.authenticate('google', { session: false, failureRedirect: `${process.env.CLIENT_URL}/login?error=oauth` }),
   (req: AuthRequest, res: Response) => {
     const user = req.user as unknown as IUser;
-    const accessToken = signAccessToken({ sub: user.id, email: user.email, displayName: user.displayName });
+    const accessToken = signAccessToken({ sub: user.id, email: user.email, displayName: user.displayName, username: user.username });
     const refreshToken = signRefreshToken({ sub: user.id, tokenVersion: user.tokenVersion });
     setRefreshCookie(res, refreshToken);
     res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${accessToken}`);

@@ -214,6 +214,10 @@ function userColor(userId: string): string {
   return `hsl(${Math.abs(hash) % 360}, 70%, 55%)`;
 }
 
+function getUserLabel(u: any): string {
+  return u?.username || u?.displayName || 'Anonymous';
+}
+
 function Toolbar({
   editor,
   onAiToggle,
@@ -471,10 +475,10 @@ function Toolbar({
         {onlineUsers.length > 0 && (
           <div className="hidden sm:flex -space-x-1.5 flex-shrink-0">
             {onlineUsers.slice(0, 4).map((u) => (
-              <div key={u.id} title={`${u.displayName} — online`}
+              <div key={u.id} title={`${getUserLabel(u)} — online`}
                 style={{ backgroundColor: userColor(u.id) }}
                 className="w-5 h-5 rounded-full ring-[1.5px] ring-white flex items-center justify-center text-white text-[9px] font-bold shadow-sm cursor-default">
-                {u.displayName?.[0]?.toUpperCase()}
+                {getUserLabel(u)?.[0]?.toUpperCase()}
               </div>
             ))}
             {onlineUsers.length > 4 && (
@@ -1070,9 +1074,9 @@ function PresenceBar({ onlineUsers, typingUsers }: { onlineUsers: any[]; typingU
               style={{ backgroundColor: userColor(u.id) }}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-white text-[11px] font-bold transition-all duration-500 shadow-apple-sm hover:scale-105">
               <span className="w-4 h-4 rounded-full bg-white/25 flex items-center justify-center text-[9px] font-black flex-shrink-0">
-                {u.displayName?.[0]?.toUpperCase()}
+                {getUserLabel(u)?.[0]?.toUpperCase()}
               </span>
-              <span className="max-w-[150px] truncate">{u.displayName}</span>
+              <span className="max-w-[150px] truncate">{getUserLabel(u)}</span>
               {isTyping ? (
                 <span className="flex items-center gap-[2px] ml-1" title="Typing">
                   <span className="w-1.5 h-1.5 rounded-full bg-white animate-bounce [animation-delay:0ms]" />
@@ -1200,7 +1204,7 @@ export default function Editor({ docId }: { docId: string }) {
         suggestion: {
           items: ({ query }: { query: string }) => {
             // Filter online users or use a list of collaborators
-            return onlineUsers.filter((u: any) => u.displayName.toLowerCase().startsWith(query.toLowerCase())).slice(0, 5);
+            return onlineUsers.filter((u: any) => getUserLabel(u).toLowerCase().startsWith(query.toLowerCase())).slice(0, 5);
           },
           render: () => {
             let component: ReactRenderer;
@@ -1251,7 +1255,7 @@ export default function Editor({ docId }: { docId: string }) {
       Collaboration.configure({ document: ydocRef.current! }),
       ...(provider ? [CollaborationCursor.configure({
         provider,
-        user: { name: user?.displayName || 'Anonymous', color: userColor(user?.id || '') },
+        user: { name: user?.username || user?.displayName || 'Anonymous', color: userColor(user?.id || '') },
       })] : []),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       FontFamily,
@@ -1288,7 +1292,7 @@ export default function Editor({ docId }: { docId: string }) {
     const socket = getSocket(token);
     if (!isTypingRef.current) {
       isTypingRef.current = true;
-      socket.emit('doc:typing', { docId, userId: user.id, displayName: user.displayName });
+      socket.emit('doc:typing', { docId, userId: user.id, username: user.username, displayName: user.displayName });
     }
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {

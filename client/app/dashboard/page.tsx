@@ -1382,7 +1382,9 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const usernameHandle = user?.displayName
+  const usernameHandle = user?.username
+    ? `@${user.username}`
+    : user?.displayName
     ? `@${user.displayName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')}`
     : '@user';
 
