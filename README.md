@@ -4,126 +4,99 @@
 [![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)](https://nextjs.org)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-brightgreen?logo=mongodb)](https://mongodb.com)
 [![Socket.IO](https://img.shields.io/badge/Socket.IO-4-010101?logo=socket.io)](https://socket.io)
-[![CI](https://github.com/yourusername/collabdocs/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/collabdocs/actions)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)](https://www.typescriptlang.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> A real-time collaborative document editor built from scratch — think Google Docs with AI writing assistance, live cursors, and version history. Built with Next.js, Node.js, Socket.IO, Y.js CRDT, and Groq AI.
+> A production-ready real-time collaborative document editor — think Google Docs, built from scratch. Multiple users edit simultaneously with live cursors, conflict-free CRDT sync, AI writing assistance, and version history.
 
-**Live Demo: [collabdocs2026.vercel.app](https://collabdocs2026.vercel.app)** · **[GitHub](https://github.com/imsumit28/CollabDocs)**
+**[Live Demo](https://collabdocs2026.vercel.app)** · **[API Docs](https://collabdocs2026.vercel.app/api/docs)** · **[GitHub](https://github.com/imsumit28/CollabDocs)**
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Setup](#setup)
+- [Design Decisions](#design-decisions)
+- [Testing](#testing)
+- [API Reference](#api-reference)
+- [Security](#security)
+- [Deployment](#deployment)
 
 ---
 
 ## Features
 
-**Collaboration**
--  **Real-Time Collaborative Editing** — Multiple users edit simultaneously via Y.js CRDT + Socket.IO. Changes propagate in ~100ms with no conflicts.
--  **Live Cursors** — Each collaborator gets a unique colour cursor with their name label.
--  **Comments** — Inline comments with reply threads and resolve/reopen flow.
--  **Suggestions Mode** — A custom, free Track Changes-style mode built on open-source TipTap extensions. No paid Pro extension required.
--  **Version History** — Browse and restore past document snapshots.
--  **Auto-Save** — Documents save every 5 seconds of inactivity to MongoDB.
+**Real-Time Collaboration**
+- **Live co-editing** — Multiple users type simultaneously via Y.js CRDT + Socket.IO. Changes propagate in ~100ms with zero conflicts.
+- **Live cursors** — Each collaborator gets a unique colour cursor with their name label, updated in real time.
+- **Comments** — Inline comments anchored to text ranges, with reply threads and resolve/reopen flow.
+- **Suggestions mode** — Track Changes-style mode built with free TipTap extensions. No paid Pro license required.
+- **Version history** — Browse and restore past snapshots of any document.
+- **Auto-save** — Documents persist every 5 seconds of inactivity via debounced writes to MongoDB.
 
 **User Features**
--  **AI Writing Assistant** — Improve writing, fix grammar, or summarise documents powered by Groq (Llama 3.3 70B).
--  **Sharing System** — Share via link with View or Edit permission levels.
--  **Export** — Download documents as PDF or DOCX.
--  **Authentication** — Email/password with JWT + Google OAuth via Passport.js.
+- **AI writing assistant** — Improve prose, fix grammar, or summarise documents. Powered by Groq (Llama 3.3 70B, free tier).
+- **Sharing** — Share documents via link with View or Edit permission levels.
+- **Export** — Download as PDF or DOCX.
+- **Authentication** — Email/password with JWT + Google OAuth.
 
 **Production-Ready**
--  **Comprehensive Testing** — 45+ test cases covering auth, documents, comments, and real-time sync (~60% coverage).
--  **API Documentation** — Interactive Swagger/OpenAPI docs at `/api/docs` with examples.
--  **Security** — JWT auth, rate limiting, input validation, CORS, Helmet headers, XSS/CSRF protection.
--  **Type Safety** — Full TypeScript coverage with strict mode enabled.
--  **Professional Documentation** — Contributing guide, security practices, testing guide, deployment instructions.
+- **45+ tests** — Auth, documents, comments, and real-time sync covered at ~60% overall.
+- **Interactive API docs** — Swagger/OpenAPI UI at `/api/docs` with request examples.
+- **Security-first** — Rate limiting, input validation, CORS, Helmet headers, XSS/CSRF protection.
+- **Full TypeScript** — End-to-end type safety across client and server.
 
 ---
 
-## Tech Stack
+## Architecture
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | Next.js 14, React, Tailwind CSS, TipTap (ProseMirror) |
-| **Real-Time** | Socket.IO, Y.js CRDT, SocketIOProvider |
-| **Backend** | Node.js, Express, TypeScript |
-| **Database** | MongoDB (Mongoose ODM) |
-| **Auth** | JWT (HS256), Google OAuth (Passport.js) |
-| **Cache/Scale** | Redis (Upstash), @socket.io/redis-adapter |
-| **AI** | Groq API — Llama 3.3 70B (free tier) |
-| **Hosting** | Vercel (frontend) + Render (backend) |
+### System Overview
 
----
+```mermaid
+graph TB
+    subgraph Clients["Browser Clients"]
+        B1["User A"]
+        B2["User B"]
+    end
 
-## Getting Started
+    subgraph Frontend["Frontend · Vercel"]
+        NX["Next.js 14\nApp Router"]
+        TE["TipTap Editor\n(ProseMirror)"]
+        YC["Y.js CRDT\nClient"]
+    end
 
-### Prerequisites
+    subgraph Backend["Backend · Render"]
+        EX["Express REST API\nPort 4000"]
+        SO["Socket.IO Server"]
+        YS["Y.js Sync Engine\n(in-memory Y.Doc per room)"]
+    end
 
-- Node.js 20+
-- MongoDB Atlas account (free tier)
-- Upstash Redis account (free tier)
-- Groq API key (free at console.groq.com)
-- Google Cloud Console project (for OAuth)
+    subgraph DataLayer["Data Layer"]
+        MG[("MongoDB Atlas\nDocuments · Users\nComments · Versions")]
+        RD[("Redis · Upstash\nSocket.IO Pub/Sub")]
+    end
 
-### Installation
+    subgraph External["External Services"]
+        GR["Groq AI\nLlama 3.3 70B"]
+        GO["Google OAuth 2.0"]
+    end
 
-```bash
-# Clone the repo
-git clone https://github.com/yourusername/collabdocs.git
-cd collabdocs
-
-# Install all dependencies
-npm install
-
-# Set up environment variables
-cp server/.env.example server/.env
-cp client/.env.example client/.env.local
-# Edit both files with your credentials
+    B1 <-->|HTTPS| NX
+    B2 <-->|HTTPS| NX
+    NX <-->|"REST API (JWT)"| EX
+    NX <-->|"WebSocket\n(Y.js binary deltas)"| SO
+    SO --> YS
+    YS <-->|"5 s debounce write"| MG
+    EX <-->|Queries| MG
+    SO <-->|Pub/Sub fan-out| RD
+    EX --> GR
+    EX --> GO
 ```
 
-### Running in Development
-
-```bash
-# Start both frontend and backend
-npm run dev
-
-# Or individually:
-npm run dev --workspace=client   # http://localhost:3000
-npm run dev --workspace=server   # http://localhost:4000
-```
-
----
-
-## Architecture Overview
-
-CollabDocs is a three-tier web application using CRDT-based conflict-free synchronisation for real-time collaboration at scale.
-
-```
-/collabdocs
-├── /client               # Next.js 14 frontend
-│   ├── /app              # App Router pages
-│   │   ├── (auth)/       # Login + Signup
-│   │   ├── dashboard/    # Document list
-│   │   └── doc/[id]/     # Editor page
-│   ├── /components       # Shared UI components
-│   ├── /contexts         # React Context (Auth)
-│   └── /lib              # API client, Socket, Y.js provider
-│
-└── /server               # Node.js + Express backend
-    ├── jest.config.js     # Test configuration
-    ├── API.md             # Complete API reference
-    ├── TESTING.md         # Testing guide
-    ├── .env.example       # Environment variable documentation
-    └── /src
-        ├── /routes        # REST API (auth, docs, versions, ai, export)
-        ├── /socket        # Socket.IO + Y.js sync engine
-        ├── /models        # Mongoose schemas
-        ├── /middleware    # JWT auth, rate limiting
-        ├── /utils         # Helpers (JWT, validation, env validation)
-        ├── /tests         # Jest test suites
-        └── swagger.ts     # OpenAPI 3.0 specification
-```
-
----
-
-### WebSocket flow
+### Real-Time Collaboration Flow
 
 ```
 Browser A                  Server                  Browser B
@@ -149,270 +122,333 @@ Browser A                  Server                  Browser B
    │                          │ flush Y.Doc if last user │
 ```
 
-1. **Auth** — JWT access token sent in Socket.IO handshake. Rejected sockets never reach event handlers.
-2. **Join** — Server loads the serialised `Y.Doc` from MongoDB, applies it to an in-memory `Y.Doc` instance shared by all sockets in the room, then sends the full state to the joining client.
-3. **Update relay** — Every keystroke produces a tiny binary Yjs delta. Server applies it to the in-memory `Y.Doc` and fans it out to all other room members with `socket.to(room).emit`. No round-trip serialisation.
-4. **Persistence** — A 5-second debounce timer resets on every update. On expiry the server encodes the `Y.Doc` state and writes it to MongoDB as a `Buffer`. This bounds write amplification to ≤12 writes/minute regardless of typing speed.
-5. **Disconnect cleanup** — Socket.IO auto-removes a socket from all rooms on disconnect. The handler iterates the rooms it had joined, re-broadcasts the updated presence list (deduplicated by user ID to handle multi-tab), and flushes + frees the `Y.Doc` if the room is now empty.
+1. **Auth** — JWT access token sent in Socket.IO handshake. Rejected connections never reach event handlers.
+2. **Join** — Server loads serialised `Y.Doc` from MongoDB into a shared in-memory instance for the room, then sends full state to the joining client.
+3. **Update relay** — Every keystroke produces a tiny binary Y.js delta. The server applies it to the in-memory `Y.Doc` and fans it out to all peers. No round-trip serialisation.
+4. **Persistence** — A 5-second debounce timer resets on every update. On expiry the server encodes the `Y.Doc` and writes to MongoDB as a `Buffer`. This bounds write amplification to ≤ 12 writes/minute regardless of typing speed.
+5. **Disconnect cleanup** — The handler re-broadcasts the updated presence list (deduplicated by user ID for multi-tab) and flushes the `Y.Doc` if the room is now empty.
+
+### Directory Structure
+
+```
+collabdocs/
+├── client/                    # Next.js 14 frontend
+│   ├── app/
+│   │   ├── (auth)/            # Login + Signup pages
+│   │   ├── dashboard/         # Document list
+│   │   └── doc/[id]/          # Editor + collaboration
+│   ├── components/            # Shared UI components
+│   ├── contexts/              # AuthContext, ToastContext
+│   └── lib/                   # API client, Socket.IO singleton, Y.js provider
+│
+└── server/                    # Node.js + Express backend
+    ├── API.md                 # Complete REST API reference
+    ├── TESTING.md             # Testing guide
+    └── src/
+        ├── routes/            # auth, documents, versions, ai, export, comments
+        ├── socket/            # Socket.IO server + Y.js sync engine
+        ├── models/            # Mongoose schemas (User, Document, Comment, Version)
+        ├── middleware/        # JWT auth, rate limiting
+        ├── utils/             # JWT helpers, validation, env validation
+        ├── swagger.ts         # OpenAPI 3.0 spec
+        └── __tests__/         # Jest test suites
+```
 
 ---
 
-### Data sync strategy — CRDT vs OT
+## Tech Stack
 
-CollabDocs uses **Yjs** (CRDT) instead of Operational Transformation (OT).
+| Layer | Technology | Why |
+|-------|-----------|-----|
+| **Frontend** | Next.js 14, React 18 | App Router, SSR, file-based routing |
+| **Editor** | TipTap (ProseMirror) | Extensible rich-text with CRDT bindings |
+| **Real-Time** | Socket.IO 4, Y.js | CRDT sync + WebSocket transport |
+| **Backend** | Node.js, Express, TypeScript | Familiar, fast, type-safe |
+| **Database** | MongoDB (Mongoose) | Schema-flexible for documents/binary Y.js state |
+| **Cache/Scale** | Redis (Upstash), Socket.IO Redis Adapter | Horizontal scaling via pub/sub fan-out |
+| **Auth** | JWT (HS256), Google OAuth (Passport.js) | Stateless, XSS-safe token strategy |
+| **AI** | Groq API — Llama 3.3 70B | Free tier, fast inference |
+| **Styling** | Tailwind CSS | Utility-first, consistent design tokens |
+| **Hosting** | Vercel + Render | Zero-config deploys from GitHub |
 
-| | OT (Google Docs) | CRDT (CollabDocs) |
+---
+
+## Setup
+
+### Prerequisites
+
+| Service | Where to get it | Required? |
+|---------|----------------|-----------|
+| Node.js 20+ | [nodejs.org](https://nodejs.org) | Yes |
+| MongoDB Atlas | [cloud.mongodb.com](https://cloud.mongodb.com) — free M0 cluster | Yes |
+| Upstash Redis | [upstash.com](https://upstash.com) — free database | Yes |
+| Groq API key | [console.groq.com](https://console.groq.com) — free tier | Yes (AI features) |
+| Google Cloud project | [console.cloud.google.com](https://console.cloud.google.com) | Optional (OAuth only) |
+
+### 1. Clone and install
+
+```bash
+git clone https://github.com/imsumit28/CollabDocs.git
+cd CollabDocs
+npm install
+```
+
+### 2. Configure environment variables
+
+```bash
+cp server/.env.example server/.env
+cp client/.env.example client/.env.local
+```
+
+**`server/.env` — key variables to fill in:**
+
+```bash
+# MongoDB: get connection string from Atlas > Connect > Drivers
+MONGODB_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/collabdocs
+
+# Redis: get from Upstash console > REST API > REDIS_URL
+REDIS_URL=redis://default:<password>@<host>:<port>
+
+# Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+JWT_ACCESS_SECRET=<32-char-hex>
+JWT_REFRESH_SECRET=<32-char-hex>
+
+# Groq: copy from console.groq.com > API Keys
+GROQ_API_KEY=gsk_...
+
+# Google OAuth (optional): create at console.cloud.google.com > Credentials
+GOOGLE_CLIENT_ID=...apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=...
+
+# These work as-is for local dev
+PORT=4000
+NODE_ENV=development
+CLIENT_URL=http://localhost:3000
+API_URL=http://localhost:4000
+```
+
+**`client/.env.local` — two variables, both point to the backend:**
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:4000
+NEXT_PUBLIC_SOCKET_URL=http://localhost:4000
+```
+
+### 3. Run in development
+
+```bash
+npm run dev
+# Frontend → http://localhost:3000
+# Backend  → http://localhost:4000
+# API Docs → http://localhost:4000/api/docs
+```
+
+Or run individually:
+
+```bash
+npm run dev --workspace=client   # Frontend only
+npm run dev --workspace=server   # Backend only
+```
+
+### Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| MongoDB connection error | Whitelist your IP in Atlas → Network Access → Add IP |
+| Redis connection error | Copy the full `REDIS_URL` from Upstash console (includes password) |
+| Socket.IO fails in browser | Check `NEXT_PUBLIC_SOCKET_URL` matches the running backend port |
+| Port 3000/4000 in use | `npx kill-port 3000 4000` |
+| Tests failing after env change | `npm run test -- --clearCache` |
+
+---
+
+## Design Decisions
+
+### 1. Y.js CRDT instead of Operational Transformation
+
+The central architecture question for any collaborative editor is: how do you merge concurrent edits?
+
+| | OT (Google Docs approach) | CRDT (CollabDocs) |
 |---|---|---|
 | Conflict resolution | Server serialises all ops, transforms concurrent ones | Each client merges independently — always converges |
-| Server role | Central arbiter required | Dumb relay — no conflict logic |
-| Offline support | Hard — requires reconnect protocol | Built-in — merge on reconnect |
-| Horizontal scaling | Difficult without sticky sessions | Trivial — Redis adapter for pub/sub fan-out |
+| Server role | Central arbiter required | Dumb relay — no conflict logic needed |
+| Offline support | Hard — requires reconnect protocol | Built-in — merge on reconnect automatically |
+| Horizontal scaling | Difficult without sticky sessions | Trivial — any server can relay any delta |
 
-### Conflict handling in detail
+**Why CRDT:** The server becomes a dumb relay. It applies deltas to an in-memory `Y.Doc` and broadcasts them. No conflict resolution logic on the server means the backend is stateless enough to scale horizontally.
 
-When two users type into the same position simultaneously:
+**How conflicts resolve in practice:**
 
 ```
-Initial state: "Hello"
+Initial:  "Hello"
+User A (offline): inserts " World" at pos 5  →  "Hello World"
+User B (offline): inserts " There" at pos 5  →  "Hello There"
 
-User A (offline): inserts " World" at position 5  →  "Hello World"
-User B (offline): inserts " There" at position 5  →  "Hello There"
-
-After sync (Yjs CRDT merge):
-Both clients converge to "Hello World There" (or "Hello There World")
-— determined by peer ID ordering, same result on every client, every time.
+After sync: both clients converge to "Hello World There"
+(peer ID ordering determines sequence — same result everywhere)
 ```
 
-- **Insertions** never destroy each other's content.
-- **Deletions** are marked as tombstones internally, so they don't corrupt remote insertions at the same position.
-- **Cursor positions** are Yjs *relative positions* — anchored to a character identity, not an index — so remote edits don't misplace your cursor.
+Insertions never destroy each other. Deletions become tombstones internally. Cursor positions are Y.js *relative positions* (anchored to a character identity, not an index), so remote edits never misplace your cursor.
 
 ---
 
-**Key design decision**: Y.js CRDT handles all merge conflicts on the client. The server is a dumb relay — it broadcasts Y.js diffs to room peers and persists binary state to MongoDB. No conflict resolution logic needed server-side.
+### 2. JWT in memory + HttpOnly refresh cookies
 
-**Collaboration note**: The suggestions/track-changes experience is implemented as a custom in-house extension path using free TipTap building blocks. It does not depend on TipTap Pro or any paid plan.
+Storing JWTs in `localStorage` means any XSS payload can exfiltrate them. The strategy here:
 
----
+- **Access token (15 min)** — held in React state only. Never written to the DOM or storage. Lost on page refresh (by design).
+- **Refresh token (7 days)** — stored in an `HttpOnly`, `Secure`, `SameSite=Strict` cookie. JavaScript cannot read it; the browser sends it automatically.
 
-## Screenshots
-
-| Dashboard | Editor | AI Panel |
-|-----------|--------|----------|
-| *(screenshot)* | *(screenshot)* | *(screenshot)* |
+On page load the client silently calls `/api/auth/refresh` — the browser sends the cookie, the server returns a new access token in the JSON body. This gives the "stay logged in" UX without exposing credentials to JS.
 
 ---
 
-## Key Technical Insights
+### 3. Debounced MongoDB writes (5 s)
 
-### Architectural Patterns
-- **CRDT vs OT**: Y.js CRDT lets every client apply updates immediately without locking, making the architecture horizontally scalable from day one.
-- **WebSocket scaling**: Redis pub/sub adapter for Socket.IO means adding more backend instances requires zero code changes — just a config update.
-- **Stateless design**: JWT auth, CRDT sync, and Redis adapter work together to enable horizontal scaling without infrastructure changes.
+Naive approach: write to the database on every keystroke. At 5 chars/second, that's 300 writes/minute per active user.
 
-### Production Readiness
-- **Security-first approach**: Input validation, environment configuration, rate limiting, and CORS all configured at startup, with environment variable validation preventing misconfiguration.
-- **Comprehensive testing**: 45+ test cases with ~60% coverage ensure critical paths (auth, documents, collaboration) work correctly before production.
-- **Observable API**: Interactive Swagger documentation and comprehensive API reference make integration straightforward for other developers.
-- **Professional practices**: Strict TypeScript, code quality tools (ESLint, Prettier), GitHub templates, and contribution guidelines establish confidence in code quality.
-
-### Security Best Practices
-- **JWT tokens**: Access tokens in memory (not localStorage), refresh tokens in HttpOnly cookies — prevents XSS from stealing auth credentials.
-- **Configurable validation**: Email, password, and input length validation all configurable via environment, allowing different security postures for dev/staging/production.
+CollabDocs instead keeps a per-room `Y.Doc` in memory and resets a 5-second debounce timer on every update. On expiry, one write happens. This bounds write amplification to **≤ 12 writes/minute regardless of typing speed** while keeping data loss risk to ≤ 5 seconds of edits.
 
 ---
 
-## Testing & Quality Assurance
+### 4. Redis adapter for horizontal Socket.IO scaling
 
-### Test Coverage
+Socket.IO's in-process room registry breaks the moment you have more than one backend instance — a user on server A won't see events from server B.
 
-CollabDocs includes comprehensive test suites covering critical functionality:
+The `@socket.io/redis-adapter` solves this by using Redis pub/sub: when server A emits to a room, it publishes to Redis; all other instances subscribed to that channel fan it out. Adding a second backend instance requires zero code changes — just point both at the same Redis URL.
+
+---
+
+### 5. TipTap (ProseMirror) over Slate or Quill
+
+TipTap has a first-class `y-prosemirror` binding for Y.js CRDT sync, and its extension system made building comments, suggestions mode, slash commands, and @mentions straightforward. Slate would have required building the Y.js binding from scratch. Quill is significantly more constrained for custom extensions.
+
+---
+
+## Testing
 
 ```bash
-npm run test --workspace=server              # Run all tests with coverage
-npm run test:watch --workspace=server        # Watch mode for development
-npm run test:ci --workspace=server           # CI mode
+npm run test --workspace=server              # Run all tests + coverage report
+npm run test:watch --workspace=server        # Watch mode
+npm run test:ci --workspace=server           # CI mode (strict coverage threshold)
 ```
 
-**Test Coverage by Module:**
 | Module | Coverage | Test Cases |
 |--------|----------|-----------|
-| Auth Routes | ~75% | 12 test cases |
-| Document Routes | ~72% | 15 test cases |
-| Comment Routes | ~65% | 10 test cases |
-| WebSocket Sync | ~45% | 8 test cases |
-| **Overall** | **~60%** | **45+ tests** |
+| Auth Routes | ~75% | 12 |
+| Document Routes | ~72% | 15 |
+| Comment Routes | ~65% | 10 |
+| WebSocket Sync | ~45% | 8 |
+| **Overall** | **~60%** | **45+** |
 
-**What's Tested:**
-- User signup, login, token refresh, logout
-- Document CRUD, access control, trash management
-- Comment creation, replies, resolution
-- Real-time sync (Y.js CRDT, concurrent edits, offline merging)
-- Rate limiting, validation, error handling
+Tests cover: signup/login/refresh/logout, document CRUD and access control, comment creation/replies/resolution, Y.js CRDT concurrent edits and offline merges, rate limiting, and input validation.
 
-See [TESTING.md](server/TESTING.md) for detailed testing guide.
-
-### Code Quality
-
-- **TypeScript** with strict mode and full type coverage
-- **ESLint** for code standards
-- **Prettier** for consistent formatting
-- **Husky** for pre-commit hooks
-
-```bash
-npm run type-check                           # TypeScript validation
-npm run lint                                 # ESLint
-npm run format                               # Prettier formatting
-```
+See [server/TESTING.md](server/TESTING.md) for the full testing guide.
 
 ---
 
-## API Documentation
+## API Reference
 
-CollabDocs provides interactive API documentation via Swagger/OpenAPI:
+Interactive Swagger UI available at `http://localhost:4000/api/docs` when the server is running.
 
-```bash
-npm run dev --workspace=server
-# Open http://localhost:4000/api/docs in your browser
-```
+**Key endpoints:**
 
-**API Coverage:**
-- **25+ endpoints** fully documented
-- **Request/response examples** with JSON
-- **Authentication requirements** (JWT Bearer token, HttpOnly cookies)
-- **Error codes** and meanings (400, 401, 403, 404, 429, 500)
-- **Rate limiting** details per endpoint
-- **WebSocket events** with payload schemas
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/auth/signup` | Create account |
+| `POST` | `/api/auth/login` | Login, receive access token + refresh cookie |
+| `GET` | `/api/auth/me` | Current user profile |
+| `POST` | `/api/auth/refresh` | Exchange refresh cookie for new access token |
+| `GET` | `/api/documents` | List owned + shared documents |
+| `POST` | `/api/documents` | Create document |
+| `GET` | `/api/documents/:id` | Get document content |
+| `PATCH` | `/api/documents/:id` | Update title |
+| `DELETE` | `/api/documents/:id` | Soft-delete (trash) |
+| `POST` | `/api/documents/:id/share` | Generate share link |
+| `GET` | `/api/versions/:docId` | List document versions |
+| `POST` | `/api/versions/:docId` | Save named snapshot |
+| `POST` | `/api/comments` | Add inline comment |
+| `GET` | `/api/comments/:docId` | List comments |
+| `PATCH` | `/api/comments/:id/resolve` | Resolve comment |
+| `POST` | `/api/ai/assist` | AI writing assistance |
+| `POST` | `/api/export/:id/pdf` | Export as PDF |
+| `POST` | `/api/export/:id/docx` | Export as DOCX |
 
-**Documents:**
-- **[API.md](server/API.md)** — Complete REST API reference with curl examples
-- **[/api/docs](http://localhost:4000/api/docs)** — Interactive Swagger UI (requires running server)
-- **[/api/docs/swagger.json](http://localhost:4000/api/docs/swagger.json)** — OpenAPI 3.0 specification
+**WebSocket events (Socket.IO):**
+
+| Event | Direction | Description |
+|-------|-----------|-------------|
+| `doc:join` | client → server | Join a document room |
+| `yjs:sync` | server → client | Full Y.Doc state on join |
+| `yjs:update` | bidirectional | Binary Y.js delta (keystroke) |
+| `doc:awareness` | bidirectional | Cursor position + user presence |
+| `doc:saved` | server → client | Persistence confirmation |
+
+See [server/API.md](server/API.md) for curl examples and full schema documentation.
 
 ---
 
 ## Security
 
-CollabDocs is built with security as a first-class concern:
+- **JWT strategy** — Access tokens in memory (not `localStorage`), refresh tokens in `HttpOnly` cookies — XSS cannot exfiltrate credentials.
+- **Rate limiting** — Auth endpoints: 5 req/15 min. AI endpoint: 30 req/hour per user.
+- **Input validation** — Email format, password strength (configurable), display name length, document title, comment body, AI input length.
+- **Helmet.js** — Strict Content Security Policy, X-Frame-Options, HSTS, and other security headers.
+- **bcryptjs** — Passwords hashed with 12 salt rounds.
+- **CORS** — Restricted to configured `CLIENT_URL` origin.
+- **Environment validation** — Server refuses to start if required secrets are missing or too short.
 
-### Security Features
-
-- **JWT Authentication** — Access tokens in memory, refresh tokens in HttpOnly cookies
-- **Password Strength** — Configurable requirements (min length, uppercase, numbers, special chars)
-- **Input Validation** — Email, password, display name, document title, comments, AI input
-- **MongoDB ObjectId Validation** — Prevents invalid document access
-- **Rate Limiting** — Auth (5 req/15min), Signup (5 req/15min), AI (30 req/hour per user)
-- **CORS Configuration** — Restricted to configured origins
-- **Helmet.js** — Security headers (CSP, X-Frame-Options, etc.)
-- **bcryptjs** — Password hashing (12 salt rounds)
-- **Environment Validation** — Critical variables validated at server startup
-- **XSS Protection** — HTML escaping, Content Security Policy
-- **CSRF Protection** — SameSite cookie configuration
-
-### Deployment Checklist
-
-Before deploying to production:
-
-```bash
-# Generate strong JWT secrets (32+ characters)
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-
-# Enable strict password requirements
-PASSWORD_MIN_LENGTH=12
-PASSWORD_REQUIRE_UPPERCASE=true
-PASSWORD_REQUIRE_NUMBERS=true
-PASSWORD_REQUIRE_SPECIAL_CHARS=true
-
-# Set NODE_ENV to production
-NODE_ENV=production
-
-# Configure Redis for distributed sessions
-REDIS_URL=redis://:password@host:port
-
-# Enable HTTPS in production (via load balancer/reverse proxy)
-```
-
-See [SECURITY.md](SECURITY.md) for threat model, incident reporting, and detailed security practices.
-
----
-
-## Development & Contributing
-
-### Quick Start for Development
-
-```bash
-# Install dependencies
-npm install
-
-# Create environment files
-cp server/.env.example server/.env
-cp client/.env.example client/.env.local
-# Edit with your API keys and configuration
-
-# Start development server
-npm run dev
-
-# Frontend: http://localhost:3000
-# Backend: http://localhost:4000
-# API Docs: http://localhost:4000/api/docs
-```
-
-### Project Documentation
-
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** — Development setup, coding standards, git workflow, PR process
-- **[TESTING.md](server/TESTING.md)** — Testing guide with examples and best practices
-- **[CHANGELOG.md](CHANGELOG.md)** — Feature history and version releases
-- **[SECURITY.md](SECURITY.md)** — Security practices, threat model, incident reporting
-
-### GitHub Templates
-
-Professional issue and PR templates included:
-- `.github/ISSUE_TEMPLATE/bug_report.md` — Bug report template
-- `.github/ISSUE_TEMPLATE/feature_request.md` — Feature request template
-- `.github/PULL_REQUEST_TEMPLATE.md` — PR template with checklist
-
----
-
-## What This Demonstrates
-
-This project showcases understanding of:
-
-**Full-Stack Development**
-- Frontend: Next.js 14, React, TailwindCSS, real-time state management
-- Backend: Node.js, Express, WebSockets, API design
-- Database: MongoDB with Mongoose ODM, data modeling
-- Real-time: Y.js CRDT, Socket.IO, distributed state sync
-
-**Production Engineering**
-- Testing: Jest unit tests, integration tests, test utilities, ~60% coverage
-- Security: JWT auth, rate limiting, input validation, environment hardening
-- Documentation: Swagger/OpenAPI, README, CONTRIBUTING, SECURITY guides
-- Code quality: TypeScript strict mode, ESLint, Prettier, pre-commit hooks
-
-**System Design**
-- Conflict-free synchronisation (CRDT) for multi-user editing without merge conflicts
-- Horizontal scalability via stateless services and Redis pub/sub
-- Debounce strategy for write amplification control (~12 writes/min regardless of typing speed)
-- Permission and access control patterns
-
-**Software Engineering Practices**
-- Clean architecture with separation of concerns (routes, models, middleware, utils)
-- Type safety with TypeScript throughout
-- Professional documentation and contribution guidelines
-- GitHub workflow with templates and CI/CD readiness
-- Error handling, validation, and security as first-class concerns
+See [SECURITY.md](SECURITY.md) for threat model, hardening checklist, and incident reporting.
 
 ---
 
 ## Deployment
 
-- **Frontend**: Deploy `/client` to Vercel via GitHub integration. Set `NEXT_PUBLIC_API_URL` in Vercel dashboard.
-- **Backend**: Deploy `/server` to Render. Connect your GitHub repo, set root directory to `server`, add all backend env vars.
+### Frontend → Vercel
 
-📋 **See [Task Breakdown](./task_breakdown.md#11-deployment--devops)** for detailed step-by-step deployment instructions, infrastructure setup, and CI/CD configuration.
+1. Push to GitHub
+2. Import the repo in Vercel, set root to `client`
+3. Add environment variable: `NEXT_PUBLIC_API_URL=https://your-backend.onrender.com`
+4. Add: `NEXT_PUBLIC_SOCKET_URL=https://your-backend.onrender.com`
+
+### Backend → Render
+
+1. Create a new Web Service, connect the GitHub repo
+2. Set **Root Directory** to `server`
+3. Build command: `npm install && npm run build`
+4. Start command: `npm run start`
+5. Add all variables from `server/.env.example` (MongoDB URI, Redis URL, JWT secrets, etc.)
+
+**Production env checklist:**
+
+```bash
+# Generate strong JWT secrets
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+NODE_ENV=production
+PASSWORD_MIN_LENGTH=12
+PASSWORD_REQUIRE_UPPERCASE=true
+PASSWORD_REQUIRE_NUMBERS=true
+```
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, code standards, and the PR process.
+
+Key commands:
+
+```bash
+npm run type-check          # TypeScript validation (both workspaces)
+npm run lint                # ESLint
+npm run test --workspace=server   # Run tests
+```
+
+Pre-commit hooks (Husky + lint-staged) run ESLint and Prettier automatically.
 
 ---
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
