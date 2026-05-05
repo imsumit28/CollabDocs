@@ -12,8 +12,13 @@ function OAuthCallbackInner() {
     (async () => {
       const token = searchParams.get('token') ?? undefined;
       const ok = await completeOAuthLogin(token);
-      if (ok) router.replace('/dashboard');
-      else router.replace('/login?error=oauth');
+      if (ok) {
+        const redirect = sessionStorage.getItem('postLoginRedirect');
+        sessionStorage.removeItem('postLoginRedirect');
+        router.replace(redirect || '/dashboard');
+      } else {
+        router.replace('/login?error=oauth');
+      }
     })();
   }, [router, completeOAuthLogin, searchParams]);
 

@@ -1132,8 +1132,8 @@ export default function Editor({ docId }: { docId: string }) {
   useEffect(() => {
     if (authLoading) return;
     if (!token || !user) {
-      const next = encodeURIComponent(window.location.pathname + window.location.search);
-      router.replace(`/login?next=${next}`);
+      sessionStorage.setItem('postLoginRedirect', window.location.pathname + window.location.search);
+      router.replace('/login');
       return;
     }
     const socket = getSocket(token);

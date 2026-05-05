@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -213,10 +213,6 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const nextUrlRef = useRef('');
-  useEffect(() => {
-    nextUrlRef.current = new URLSearchParams(window.location.search).get('next') ?? '';
-  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -224,7 +220,9 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      router.replace(nextUrlRef.current || '/dashboard');
+      const redirect = sessionStorage.getItem('postLoginRedirect');
+      sessionStorage.removeItem('postLoginRedirect');
+      router.replace(redirect || '/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed. Please try again.');
     } finally {
