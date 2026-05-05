@@ -364,6 +364,12 @@ export default function SignupPage() {
   const { signup } = useAuth();
   const router = useRouter();
 
+  const finishSignup = () => {
+    const redirect = sessionStorage.getItem('postLoginRedirect');
+    sessionStorage.removeItem('postLoginRedirect');
+    router.replace(redirect || '/dashboard');
+  };
+
   const [step, setStep] = useState<Step>(1);
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -618,7 +624,7 @@ export default function SignupPage() {
 
               <button
                 type="button"
-                onClick={() => router.replace('/dashboard')}
+                onClick={() => finishSignup()}
                 className="mt-5 w-full text-center text-[13px] text-[#94A3B8] hover:text-[#64748B] transition-colors"
               >
                 Skip for now →
@@ -671,7 +677,7 @@ export default function SignupPage() {
 
                 <button
                   type="button"
-                  onClick={() => router.replace('/dashboard')}
+                  onClick={() => finishSignup()}
                   className="w-full text-center text-[13px] text-[#94A3B8] hover:text-[#64748B] transition-colors"
                 >
                   Skip for now →
@@ -732,14 +738,14 @@ export default function SignupPage() {
                 <div className="pt-2 space-y-3">
                   <button
                     type="button"
-                    onClick={() => router.replace('/dashboard')}
+                    onClick={() => finishSignup()}
                     className={ctaClass}
                   >
                     Send invites &amp; go to dashboard
                   </button>
                   <button
                     type="button"
-                    onClick={() => router.replace('/dashboard')}
+                    onClick={() => finishSignup()}
                     className="h-[44px] w-full rounded-xl border border-[#E2E8F0] text-[14px] text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#0F172A] transition-all"
                   >
                     Skip for now →
