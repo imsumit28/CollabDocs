@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import express from 'express';
 import http from 'http';
+import https from 'https';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -71,6 +72,15 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 const PORT = process.env.PORT || 4000;
+const HEALTHCHECKS_URL = 'https://hc-ping.com/7a8c2ad4-ab3b-4ce1-84a0-f1327a053c74';
+
+function pingHealthchecks() {
+  https.get(HEALTHCHECKS_URL, (res) => {
+    console.log(`Healthchecks.io pinged: ${res.statusCode}`);
+  }).on('error', (err) => {
+    console.error('Failed to ping Healthchecks.io:', err.message);
+  });
+}
 
 async function start() {
   validateEnvVars();
@@ -80,6 +90,9 @@ async function start() {
   server.listen(PORT, () => {
     console.log(`CollabDocs server running on port ${PORT}`);
   });
+
+  pingHealthchecks();
+  setInterval(pingHealthchecks, 270000);
 }
 
 start().catch(console.error);
