@@ -1573,7 +1573,7 @@ export default function DashboardPage() {
                   <span className="hidden sm:inline text-sm text-[#6E6E73] font-medium">{user.displayName}</span>
                 </button>
 
-                {profileMenuOpen && (
+                {profileMenuOpen && typeof document !== 'undefined' && createPortal(
                   <>
                     <div
                       className="fixed inset-0 bg-black/20 backdrop-blur-[1px] z-40"
@@ -1607,7 +1607,8 @@ export default function DashboardPage() {
                         Sign out
                       </button>
                     </div>
-                  </>
+                  </>,
+                  document.body
                 )}
               </div>
             )}
