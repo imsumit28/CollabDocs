@@ -1576,11 +1576,11 @@ export default function DashboardPage() {
                 {profileMenuOpen && (
                   <>
                     <div
-                      className="fixed inset-0 bg-black/20 backdrop-blur-[1px] z-40 lg:hidden"
+                      className="fixed inset-0 bg-black/20 backdrop-blur-[1px] z-40"
                       onClick={() => setProfileMenuOpen(false)}
                     />
-                    <div className="fixed lg:absolute left-0 right-0 lg:left-auto lg:right-0 bottom-0 lg:bottom-auto lg:top-[calc(100%+8px)] w-full lg:w-56 bg-white border border-[rgba(0,0,0,0.08)] shadow-lg rounded-t-2xl lg:rounded-xl p-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] z-50">
-                      <div className="lg:hidden w-10 h-1 bg-[#D1D5DB] rounded-full mx-auto my-2" />
+                    <div className="fixed left-0 right-0 bottom-0 w-full bg-white border border-[rgba(0,0,0,0.08)] shadow-lg rounded-t-2xl p-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] z-50">
+                      <div className="w-10 h-1 bg-[#D1D5DB] rounded-full mx-auto my-2" />
                       <div className="px-3 py-2 border-b border-[rgba(0,0,0,0.06)]">
                         <p className="text-[11px] text-[#8E8E93]">Username</p>
                         <p className="text-sm font-semibold text-[#1D1D1F] truncate">{usernameHandle}</p>
