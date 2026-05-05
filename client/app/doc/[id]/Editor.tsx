@@ -1067,7 +1067,7 @@ function PresenceBar({ onlineUsers, typingUsers }: { onlineUsers: any[]; typingU
               <span className="w-4 h-4 rounded-full bg-white/25 flex items-center justify-center text-[9px] font-black flex-shrink-0">
                 {u.displayName?.[0]?.toUpperCase()}
               </span>
-              <span className="max-w-[90px] truncate">{u.displayName}</span>
+              <span className="max-w-[150px] truncate">{u.displayName}</span>
               {isTyping ? (
                 <span className="flex items-center gap-[2px] ml-1" title="Typing">
                   <span className="w-1.5 h-1.5 rounded-full bg-white animate-bounce [animation-delay:0ms]" />
