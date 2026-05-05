@@ -213,6 +213,11 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Capture ?next= synchronously at first render before any navigation changes window.location
+  const [nextUrl] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    return new URLSearchParams(window.location.search).get('next') ?? '';
+  });
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -220,8 +225,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      const next = new URLSearchParams(window.location.search).get('next');
-      router.replace(next || '/dashboard');
+      router.replace(nextUrl || '/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed. Please try again.');
     } finally {
