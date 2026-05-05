@@ -1203,8 +1203,10 @@ export default function DashboardPage() {
   const { user, logout, loading } = useAuth();
   const router = useRouter();
   const toast = useToast();
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [filterMode, setFilterMode] = useState<'all' | 'shared' | 'starred' | 'trash'>('all');
   const [deleteModal, setDeleteModal] = useState<string | null>(null);
   const [renameDoc, setRenameDoc] = useState<Doc | null>(null);
@@ -1362,6 +1364,27 @@ export default function DashboardPage() {
     }, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setProfileMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
+  const usernameHandle = user?.displayName
+    ? `@${user.displayName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')}`
+    : '@user';
 
 
 
@@ -1536,14 +1559,49 @@ export default function DashboardPage() {
             </div>
 
             {user?.displayName && (
-              <div className="hidden sm:flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-[#2563EB] flex items-center justify-center text-white text-[11px] font-bold">
-                  {user.displayName[0].toUpperCase()}
-                </div>
-                <span className="text-sm text-[#6E6E73] font-medium">{user.displayName}</span>
+              <div ref={profileMenuRef} className="hidden sm:block relative">
+                <button
+                  type="button"
+                  onClick={() => setProfileMenuOpen((prev) => !prev)}
+                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-[#F4F4F5] transition-colors"
+                >
+                  <div className="w-6 h-6 rounded-full bg-[#2563EB] flex items-center justify-center text-white text-[11px] font-bold">
+                    {user.displayName[0].toUpperCase()}
+                  </div>
+                  <span className="text-sm text-[#6E6E73] font-medium">{user.displayName}</span>
+                </button>
+
+                {profileMenuOpen && (
+                  <div className="absolute right-0 top-[calc(100%+8px)] w-56 bg-white border border-[rgba(0,0,0,0.08)] shadow-lg rounded-xl p-1.5 z-50">
+                    <div className="px-3 py-2 border-b border-[rgba(0,0,0,0.06)]">
+                      <p className="text-[11px] text-[#8E8E93]">Username</p>
+                      <p className="text-sm font-semibold text-[#1D1D1F] truncate">{usernameHandle}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setProfileMenuOpen(false); toast.info('Profile page can be added here.'); }}
+                      className="w-full text-left px-3 py-2 text-sm text-[#1D1D1F] hover:bg-[#F4F4F5] rounded-lg transition-colors"
+                    >
+                      My Profile
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setProfileMenuOpen(false); toast.info('Account settings can be added here.'); }}
+                      className="w-full text-left px-3 py-2 text-sm text-[#1D1D1F] hover:bg-[#F4F4F5] rounded-lg transition-colors"
+                    >
+                      Account Settings
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setProfileMenuOpen(false); logout(); }}
+                      className="w-full text-left px-3 py-2 text-sm text-[#D92D20] hover:bg-[#FFF1F0] rounded-lg transition-colors"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                )}
               </div>
             )}
-            <button type="button" onClick={logout} className="btn-ghost text-xs py-1.5 px-3">Sign out</button>
           </div>
         </div>
       </header>
