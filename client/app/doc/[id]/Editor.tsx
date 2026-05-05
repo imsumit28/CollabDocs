@@ -265,8 +265,8 @@ function Toolbar({
         type="button"
         title={label}
         onMouseDown={(e) => { e.preventDefault(); action(); }}
-        className={`w-[26px] h-[26px] flex items-center justify-center rounded-[5px] transition-all duration-100 flex-shrink-0
-          ${active ? 'bg-[#007AFF] text-white' : 'text-[#44454A] hover:bg-[#EBEBEF] hover:text-[#1D1D1F]'}`}
+        className={`w-[26px] h-[26px] flex items-center justify-center rounded-[5px] transition-all duration-100 flex-shrink-0 border
+          ${active ? 'bg-[#007AFF] text-white border-[#007AFF] shadow-sm' : 'text-[#44454A] border-[rgba(0,0,0,0.10)] bg-white hover:bg-[#EBEBEF] hover:text-[#1D1D1F] hover:border-[rgba(0,0,0,0.18)]'}`}
       >
         {children}
       </button>
@@ -297,7 +297,10 @@ function Toolbar({
     <div className="flex flex-col sm:flex-row sm:items-center sm:gap-0.5 sm:px-3 border-b border-[rgba(0,0,0,0.07)] bg-white/95 backdrop-blur-sm sticky top-[57px] z-10 sm:min-h-[42px]">
 
       {/* Scrollable formatting tools — full-width row on mobile */}
-      <div className="flex items-center gap-0.5 overflow-x-auto px-3 sm:px-0 min-h-[42px] sm:min-h-0 flex-1 min-w-0">
+      <div className="flex items-center overflow-x-auto px-3 sm:px-0 min-h-[42px] sm:min-h-0 flex-1 min-w-0">
+        {/* Big box wrapping all formatting tools */}
+        <div className="flex items-center gap-0.5 border border-[rgba(0,0,0,0.10)] rounded-[8px] bg-[#F5F5F7] px-1.5 py-1 flex-shrink-0">
+
         {/* Group 1 — History */}
         <IBtn label="Undo (⌘Z)" action={() => editor.chain().focus().undo().run()}>
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 0 1 8 8v2M3 10l6 6m-6-6l6-6" /></svg>
@@ -313,7 +316,7 @@ function Toolbar({
           title="Paragraph style"
           value={currentStyle}
           onChange={(e) => setStyle(e.target.value)}
-          className="h-[26px] w-[94px] rounded-[5px] text-[12px] font-semibold text-[#1D1D1F] bg-transparent hover:bg-[#EBEBEF] px-1.5 outline-none cursor-pointer flex-shrink-0 transition-colors border-0 appearance-none"
+          className="h-[26px] w-[94px] rounded-[5px] text-[12px] font-semibold text-[#1D1D1F] bg-white border border-[rgba(0,0,0,0.10)] hover:bg-[#EBEBEF] hover:border-[rgba(0,0,0,0.18)] px-1.5 outline-none cursor-pointer flex-shrink-0 transition-colors appearance-none"
         >
           <option value="p">Normal</option>
           <option value="h1">Heading 1</option>
@@ -332,7 +335,7 @@ function Toolbar({
             if (v) editor.chain().focus().setFontFamily(v).run();
             else editor.chain().focus().unsetFontFamily().run();
           }}
-          className="h-[26px] w-[88px] rounded-[5px] text-[11px] text-[#3A3A3C] bg-transparent hover:bg-[#EBEBEF] px-1 outline-none cursor-pointer flex-shrink-0 transition-colors border-0 appearance-none truncate"
+          className="h-[26px] w-[88px] rounded-[5px] text-[11px] text-[#3A3A3C] bg-white border border-[rgba(0,0,0,0.10)] hover:bg-[#EBEBEF] hover:border-[rgba(0,0,0,0.18)] px-1 outline-none cursor-pointer flex-shrink-0 transition-colors appearance-none truncate"
         >
           {FONT_OPTIONS.map((f) => <option key={f.label} value={f.value}>{f.label}</option>)}
         </select>
@@ -394,6 +397,8 @@ function Toolbar({
         <IBtn label="Insert table" action={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6Zm7-3v18" /></svg>
         </IBtn>
+
+        </div>{/* end big box */}
       </div>
 
       {/* Action buttons — second row on mobile, inline on desktop */}
@@ -1055,7 +1060,7 @@ function OutlineSidebar({ editor }: { editor: any }) {
 function PresenceBar({ onlineUsers, typingUsers }: { onlineUsers: any[]; typingUsers: Set<string> }) {
   if (onlineUsers.length === 0) return null;
   return (
-    <div className="flex items-center gap-2 px-5 py-2 border-b border-[rgba(0,0,0,0.04)] bg-[#FBFBFD] overflow-x-auto min-h-[38px] anim-fade-in shadow-inner">
+    <div className="flex items-center gap-2 px-5 py-2.5 border-b border-[rgba(0,0,0,0.04)] bg-[#FBFBFD] min-h-[44px] anim-fade-in">
       <span className="text-[10px] font-bold text-[#AEAEB2] uppercase tracking-[0.05em] flex-shrink-0">Live</span>
       <div className="flex items-center gap-2 flex-wrap">
         {onlineUsers.map((u) => {
