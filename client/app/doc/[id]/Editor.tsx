@@ -1100,7 +1100,7 @@ function PresenceBar({ onlineUsers, typingUsers }: { onlineUsers: any[]; typingU
 }
 
 export default function Editor({ docId }: { docId: string }) {
-  const { user, token } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
   const toast = useToast();
   const [title, setTitle] = useState('Untitled');
@@ -1130,7 +1130,12 @@ export default function Editor({ docId }: { docId: string }) {
   useEffect(() => { setTrackChangesEnabled(suggestionMode); }, [suggestionMode]);
 
   useEffect(() => {
-    if (!token || !user) return;
+    if (authLoading) return;
+    if (!token || !user) {
+      const next = encodeURIComponent(window.location.pathname + window.location.search);
+      router.replace(`/login?next=${next}`);
+      return;
+    }
     const socket = getSocket(token);
 
     socket.on('connect',    () => setIsOnline(true));
@@ -1177,7 +1182,7 @@ export default function Editor({ docId }: { docId: string }) {
       socket.off('doc:typing');
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
-  }, [docId, token, user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [docId, token, user, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const editor = useEditor({
     extensions: [

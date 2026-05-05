@@ -220,7 +220,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      router.replace('/dashboard');
+      const next = new URLSearchParams(window.location.search).get('next');
+      router.replace(next || '/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed. Please try again.');
     } finally {
