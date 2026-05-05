@@ -36,17 +36,6 @@ import { TrackChanges, setTrackChangesEnabled } from './TrackChanges';
 
 const lowlight = createLowlight(common);
 
-const COLLABORATOR_BADGE_COLORS = [
-  'bg-[#007AFF]',
-  'bg-[#FF3B30]',
-  'bg-[#FF9500]',
-  'bg-[#34C759]',
-  'bg-[#AF52DE]',
-  'bg-[#FF2D55]',
-  'bg-[#5AC8FA]',
-  'bg-[#FFCC00]',
-];
-
 const OUTLINE_INDENT_CLASSES = [
   'pl-2',
   'pl-5',
@@ -124,12 +113,6 @@ const IconTitle = () => (
     <path d="M4 18h16" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="3 2"/>
   </svg>
 );
-
-function getCollaboratorBadgeClass(userId: string): string {
-  let hash = 0;
-  for (let i = 0; i < userId.length; i++) hash = userId.charCodeAt(i) + ((hash << 5) - hash);
-  return COLLABORATOR_BADGE_COLORS[Math.abs(hash) % COLLABORATOR_BADGE_COLORS.length];
-}
 
 function getOutlineIndentClass(level: number): string {
   const index = Math.max(0, Math.min(OUTLINE_INDENT_CLASSES.length - 1, level - 1));
@@ -484,7 +467,8 @@ function Toolbar({
           <div className="hidden sm:flex -space-x-1.5 flex-shrink-0">
             {onlineUsers.slice(0, 4).map((u) => (
               <div key={u.id} title={`${u.displayName} — online`}
-                className={`w-5 h-5 rounded-full ring-[1.5px] ring-white flex items-center justify-center text-white text-[9px] font-bold shadow-sm cursor-default ${getCollaboratorBadgeClass(u.id)}`}>
+                style={{ backgroundColor: userColor(u.id) }}
+                className="w-5 h-5 rounded-full ring-[1.5px] ring-white flex items-center justify-center text-white text-[9px] font-bold shadow-sm cursor-default">
                 {u.displayName?.[0]?.toUpperCase()}
               </div>
             ))}
@@ -1077,7 +1061,9 @@ function PresenceBar({ onlineUsers, typingUsers }: { onlineUsers: any[]; typingU
         {onlineUsers.map((u) => {
           const isTyping = typingUsers.has(u.id);
           return (
-            <div key={u.id} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-white text-[11px] font-bold transition-all duration-500 shadow-apple-sm hover:scale-105 ${getCollaboratorBadgeClass(u.id)}`}>
+            <div key={u.id}
+              style={{ backgroundColor: userColor(u.id) }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-white text-[11px] font-bold transition-all duration-500 shadow-apple-sm hover:scale-105">
               <span className="w-4 h-4 rounded-full bg-white/25 flex items-center justify-center text-[9px] font-black flex-shrink-0">
                 {u.displayName?.[0]?.toUpperCase()}
               </span>
