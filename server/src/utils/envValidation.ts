@@ -97,9 +97,6 @@ export function warnMissingOptionalVars(): void {
   const warnings: string[] = [];
 
   if (process.env.NODE_ENV === 'production') {
-    if (!process.env.REDIS_URL) {
-      warnings.push('REDIS_URL: Redis is recommended for production scaling');
-    }
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
       warnings.push('GOOGLE_CLIENT_*: Google OAuth is recommended for user convenience');
     }
