@@ -755,7 +755,7 @@ function NewDocumentModal({ onClose, onCreate }: { onClose: () => void; onCreate
             for (let i = 1; i <= pdf.numPages; i++) {
               const page = await pdf.getPage(i);
               const textContent = await page.getTextContent();
-              const pageText = textContent.items.map((item) => item.str).join(' ');
+              const pageText = textContent.items.map((item: any) => item.str || '').join(' ');
               content += pageText + '\n\n';
             }
           } catch (e) {
