@@ -12,8 +12,8 @@ We love your input! We want to make contributing to CollabDocs as easy and trans
 ### Prerequisites
 - Node.js 20+
 - MongoDB Atlas account (free tier)
-- Upstash Redis account (free tier)
 - Groq API key (free at console.groq.com)
+- Upstash Redis (optional — only needed for multi-instance scaling in the future)
 
 ### Getting Started
 
@@ -133,7 +133,7 @@ Before making significant architectural changes (e.g., replacing Y.js, changing 
 
 ### Key Architectural Principles
 1. **CRDT-based conflict resolution** — clients can apply updates immediately, server is a dumb relay
-2. **Stateless backend** — every instance is interchangeable via Redis adapter
+2. **Stateless backend** — every instance is interchangeable; Redis adapter will be used when scaling horizontally in the future
 3. **TypeScript everywhere** — type safety across the stack
 4. **Security-first** — JWT in memory, rate limiting, CORS, helmet
 5. **Scalability** — design for horizontal scaling from day one
