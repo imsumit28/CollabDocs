@@ -76,7 +76,7 @@ const PORT = process.env.PORT || 4000;
 // Render spins down the server after 15 min of inactivity on the free tier.
 // This pings our own /health endpoint every 10 minutes to keep it alive.
 function startSelfPing() {
-  const RENDER_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+  const RENDER_URL = process.env.API_URL || `http://localhost:${PORT}`;
   const pingUrl = `${RENDER_URL}/health`;
 
   const ping = () => {
