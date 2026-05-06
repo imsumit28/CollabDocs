@@ -752,11 +752,74 @@ function NewDocumentModal({ onClose, onCreate }: { onClose: () => void; onCreate
             const arrayBuffer = await importFile.arrayBuffer();
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             
+            // Smarter PDF text extraction preserving basic formatting
+            let baseFontSize = 0;
+            const fontSizes: Record<number, number> = {};
+            
+            // First pass to find base font size
+            for (let i = 1; i <= Math.min(pdf.numPages, 3); i++) {
+              const page = await pdf.getPage(i);
+              const textContent = await page.getTextContent();
+              for (const item of textContent.items as any[]) {
+                if (item.str && item.str.trim()) {
+                  const size = Math.round(item.transform[3]);
+                  fontSizes[size] = (fontSizes[size] || 0) + item.str.length;
+                }
+              }
+            }
+            baseFontSize = parseInt(Object.keys(fontSizes).reduce((a, b) => fontSizes[parseInt(a)] > fontSizes[parseInt(b)] ? a : b, "12"));
+
             for (let i = 1; i <= pdf.numPages; i++) {
               const page = await pdf.getPage(i);
               const textContent = await page.getTextContent();
-              const pageText = textContent.items.map((item: any) => item.str || '').join(' ');
-              content += pageText + '\n\n';
+              
+              let lastY = -1;
+              let currentLine = '';
+              let currentFontSize = baseFontSize;
+              
+              for (const item of textContent.items as any[]) {
+                if (!item.str) continue;
+                
+                const y = Math.round(item.transform[5]);
+                const fontSize = Math.round(item.transform[3]);
+                const fontName = item.fontName || '';
+                const isBold = fontName.toLowerCase().includes('bold');
+                
+                let text = item.str;
+                
+                // If it's a new line (Y changed by more than a tiny amount)
+                if (lastY !== -1 && Math.abs(lastY - y) > 2) {
+                  // If it was a heading
+                  if (currentFontSize > baseFontSize + 2) {
+                    content += `<h2>${currentLine.trim()}</h2>`;
+                  } else {
+                    content += `<p>${currentLine.trim()}</p>`;
+                  }
+                  currentLine = '';
+                }
+                
+                if (isBold) {
+                  currentLine += `<strong>${text}</strong>`;
+                } else {
+                  currentLine += text;
+                }
+                
+                lastY = y;
+                currentFontSize = fontSize;
+                
+                // Add space if there is EOL but we didn't break line
+                if (item.hasEOL && currentLine) {
+                  currentLine += ' ';
+                }
+              }
+              
+              if (currentLine.trim()) {
+                if (currentFontSize > baseFontSize + 2) {
+                  content += `<h2>${currentLine.trim()}</h2>`;
+                } else {
+                  content += `<p>${currentLine.trim()}</p>`;
+                }
+              }
             }
           } catch (e) {
             console.error('Error parsing PDF:', e);
