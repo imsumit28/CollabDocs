@@ -742,7 +742,8 @@ function NewDocumentModal({ onClose, onCreate }: { onClose: () => void; onCreate
         await onCreate(selectedTemplate.title || selectedTemplate.id, selectedTemplate.id, selectedTemplate.content);
       } else if (selectedTab === 'import' && importFile) {
         // Handle file import
-        await onCreate(importFile.name.replace(/\.[^/.]+$/, ''));
+        const content = await importFile.text();
+        await onCreate(importFile.name.replace(/\.[^/.]+$/, ''), undefined, content);
       }
       console.log('Document creation completed');
       onClose();
