@@ -72,14 +72,29 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 const PORT = process.env.PORT || 4000;
-const HEALTHCHECKS_URL = 'https://hc-ping.com/7a8c2ad4-ab3b-4ce1-84a0-f1327a053c74';
+// ─── Self-Ping to prevent Render free-tier spin-down ─────────────────────────
+// Render spins down the server after 15 min of inactivity on the free tier.
+// This pings our own /health endpoint every 10 minutes to keep it alive.
+function startSelfPing() {
+  const RENDER_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+  const pingUrl = `${RENDER_URL}/health`;
 
-function pingHealthchecks() {
-  https.get(HEALTHCHECKS_URL, (res) => {
-    console.log(`Healthchecks.io pinged: ${res.statusCode}`);
-  }).on('error', (err) => {
-    console.error('Failed to ping Healthchecks.io:', err.message);
-  });
+  const ping = () => {
+    const client = pingUrl.startsWith('https') ? https : http;
+    client.get(pingUrl, (res) => {
+      console.log(`[Self-Ping] /health → ${res.statusCode}`);
+    }).on('error', (err) => {
+      console.warn(`[Self-Ping] Failed: ${err.message}`);
+    });
+  };
+
+  // Wait 30s after startup before first ping, then every 10 minutes
+  setTimeout(() => {
+    ping();
+    setInterval(ping, 10 * 60 * 1000); // every 10 minutes
+  }, 30_000);
+
+  console.log(`[Self-Ping] Scheduled every 10 min → ${pingUrl}`);
 }
 
 async function start() {
@@ -89,10 +104,8 @@ async function start() {
   initSocket(server);
   server.listen(PORT, () => {
     console.log(`CollabDocs server running on port ${PORT}`);
+    startSelfPing(); // start pinging after server is up
   });
-
-  pingHealthchecks();
-  setInterval(pingHealthchecks, 270000);
 }
 
 start().catch(console.error);
