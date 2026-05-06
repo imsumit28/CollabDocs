@@ -15,10 +15,10 @@ cp server/.env.example server/.env
 cp client/.env.example client/.env.local
 
 # Edit with your credentials (see env files for instructions)
-# - MongoDB Atlas (free)
-# - Upstash Redis (free)
-# - Groq API key (free)
-# - Google OAuth credentials
+# - MongoDB Atlas (free, required)
+# - Groq API key (free, required for AI features)
+# - Google OAuth credentials (optional)
+# - Upstash Redis (optional — for future horizontal scaling)
 
 # Start both servers
 npm run dev
@@ -150,9 +150,9 @@ collabdocs/
 - **Password**: Hashed with bcryptjs (10 rounds)
 
 ### Scalability
-- **Redis Adapter**: Horizontal scaling with Socket.IO
 - **Stateless Backend**: Every instance is interchangeable
 - **Debounced Saves**: 5s debounce bounds writes to ~12/min
+- **Redis Adapter** *(planned)*: Socket.IO horizontal scaling via pub/sub — activates automatically when `REDIS_URL` is set
 
 ---
 
@@ -260,9 +260,8 @@ lsof -i :4000 | grep LISTEN | awk '{print $2}' | xargs kill -9
 - Check `MONGODB_URI` in `server/.env`
 
 ### Redis Connection Error
-- Ensure Upstash Redis account is created
-- Copy correct `REDIS_URL` from Upstash console
-- Check `REDIS_URL` in `server/.env`
+- `REDIS_URL` is **optional** — the server works without it on a single instance
+- If you do want Redis: copy the full `REDIS_URL` from Upstash console and set it in `server/.env`
 
 ### Tests Failing
 ```bash

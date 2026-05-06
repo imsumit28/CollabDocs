@@ -76,7 +76,7 @@ graph TB
 
     subgraph DataLayer["Data Layer"]
         MG[("MongoDB Atlas\nDocuments · Users\nComments · Versions")]
-        RD[("Redis · Upstash\nSocket.IO Pub/Sub")]
+        RD[("Redis · Upstash\nSocket.IO Pub/Sub\n(planned)")]
     end
 
     subgraph External["External Services"]
@@ -165,7 +165,7 @@ collabdocs/
 | **Real-Time** | Socket.IO 4, Y.js | CRDT sync + WebSocket transport |
 | **Backend** | Node.js, Express, TypeScript | Familiar, fast, type-safe |
 | **Database** | MongoDB (Mongoose) | Schema-flexible for documents/binary Y.js state |
-| **Cache/Scale** | Redis (Upstash), Socket.IO Redis Adapter | Horizontal scaling via pub/sub fan-out |
+| **Cache/Scale** | Redis (Upstash) *(planned)* | Future horizontal scaling via Socket.IO pub/sub fan-out |
 | **Auth** | JWT (HS256), Google OAuth (Passport.js) | Stateless, XSS-safe token strategy |
 | **AI** | Groq API — Llama 3.3 70B | Free tier, fast inference |
 | **Styling** | Tailwind CSS | Utility-first, consistent design tokens |
@@ -181,9 +181,9 @@ collabdocs/
 |---------|----------------|-----------|
 | Node.js 20+ | [nodejs.org](https://nodejs.org) | Yes |
 | MongoDB Atlas | [cloud.mongodb.com](https://cloud.mongodb.com) — free M0 cluster | Yes |
-| Upstash Redis | [upstash.com](https://upstash.com) — free database | Yes |
 | Groq API key | [console.groq.com](https://console.groq.com) — free tier | Yes (AI features) |
 | Google Cloud project | [console.cloud.google.com](https://console.cloud.google.com) | Optional (OAuth only) |
+| Upstash Redis | [upstash.com](https://upstash.com) — free database | Optional (future scaling) |
 
 ### 1. Clone and install
 
@@ -206,8 +206,9 @@ cp client/.env.example client/.env.local
 # MongoDB: get connection string from Atlas > Connect > Drivers
 MONGODB_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/collabdocs
 
-# Redis: get from Upstash console > REST API > REDIS_URL
-REDIS_URL=redis://default:<password>@<host>:<port>
+# Redis: optional — only needed for horizontal scaling across multiple instances
+# In future: get from Upstash console > REST API > REDIS_URL
+# REDIS_URL=redis://default:<password>@<host>:<port>
 
 # Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 JWT_ACCESS_SECRET=<32-char-hex>
@@ -255,7 +256,6 @@ npm run dev --workspace=server   # Backend only
 | Problem | Fix |
 |---------|-----|
 | MongoDB connection error | Whitelist your IP in Atlas → Network Access → Add IP |
-| Redis connection error | Copy the full `REDIS_URL` from Upstash console (includes password) |
 | Socket.IO fails in browser | Check `NEXT_PUBLIC_SOCKET_URL` matches the running backend port |
 | Port 3000/4000 in use | `npx kill-port 3000 4000` |
 | Tests failing after env change | `npm run test -- --clearCache` |
@@ -311,11 +311,11 @@ CollabDocs instead keeps a per-room `Y.Doc` in memory and resets a 5-second debo
 
 ---
 
-### 4. Redis adapter for horizontal Socket.IO scaling
+### 4. Redis adapter for horizontal Socket.IO scaling *(planned)*
 
 Socket.IO's in-process room registry breaks the moment you have more than one backend instance — a user on server A won't see events from server B.
 
-The `@socket.io/redis-adapter` solves this by using Redis pub/sub: when server A emits to a room, it publishes to Redis; all other instances subscribed to that channel fan it out. Adding a second backend instance requires zero code changes — just point both at the same Redis URL.
+The `@socket.io/redis-adapter` is already integrated in the codebase and activates automatically when `REDIS_URL` is set. Currently the app runs on a single Render instance (free tier), so Redis is not required. When scaling to multiple instances in the future, simply add a `REDIS_URL` env var — no code changes needed.
 
 ---
 
@@ -417,7 +417,7 @@ See [SECURITY.md](SECURITY.md) for threat model, hardening checklist, and incide
 2. Set **Root Directory** to `server`
 3. Build command: `npm install && npm run build`
 4. Start command: `npm run start`
-5. Add all variables from `server/.env.example` (MongoDB URI, Redis URL, JWT secrets, etc.)
+5. Add all variables from `server/.env.example` (MongoDB URI, JWT secrets, etc.) — `REDIS_URL` is optional
 
 **Production env checklist:**
 
