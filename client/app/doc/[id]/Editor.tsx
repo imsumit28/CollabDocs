@@ -1275,16 +1275,36 @@ export default function Editor({ docId }: { docId: string }) {
 
   // Initialize template content if present
   useEffect(() => {
-    if (!editor || !ydocRef.current) return;
+    if (!editor || !ydocRef.current || !provider) return;
 
     const templateKey = `doc_${docId}_template`;
-    const templateContent = sessionStorage.getItem(templateKey);
+    let templateContent = sessionStorage.getItem(templateKey);
 
-    if (templateContent && editor.isEmpty) {
-      editor.commands.setContent(templateContent);
-      sessionStorage.removeItem(templateKey);
+    if (templateContent) {
+      const init = () => {
+        if (editor.isEmpty) {
+          // Check if it's plain text without HTML tags and format it
+          if (!templateContent.trim().startsWith('<')) {
+            templateContent = templateContent.split('\n').map(line => `<p>${line}</p>`).join('');
+          }
+          editor.commands.setContent(templateContent);
+          sessionStorage.removeItem(templateKey);
+        }
+      };
+
+      if (provider.synced) {
+        init();
+      } else {
+        const interval = setInterval(() => {
+          if (provider.synced) {
+            clearInterval(interval);
+            init();
+          }
+        }, 100);
+        return () => clearInterval(interval);
+      }
     }
-  }, [editor, docId]);
+  }, [editor, docId, provider]);
 
   // Emit typing event when user types
   const handleTyping = useCallback(() => {
