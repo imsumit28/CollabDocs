@@ -742,7 +742,40 @@ function NewDocumentModal({ onClose, onCreate }: { onClose: () => void; onCreate
         await onCreate(selectedTemplate.title || selectedTemplate.id, selectedTemplate.id, selectedTemplate.content);
       } else if (selectedTab === 'import' && importFile) {
         // Handle file import
-        const content = await importFile.text();
+        const extension = importFile.name.split('.').pop()?.toLowerCase();
+        let content = '';
+
+        if (extension === 'pdf') {
+          try {
+            const pdfjsLib = await import('pdfjs-dist');
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+            const arrayBuffer = await importFile.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+              const page = await pdf.getPage(i);
+              const textContent = await page.getTextContent();
+              const pageText = textContent.items.map((item) => item.str).join(' ');
+              content += pageText + '\n\n';
+            }
+          } catch (e) {
+            console.error('Error parsing PDF:', e);
+            content = await importFile.text(); // Fallback
+          }
+        } else if (extension === 'docx') {
+          try {
+            const mammoth = (await import('mammoth')).default || await import('mammoth');
+            const arrayBuffer = await importFile.arrayBuffer();
+            const result = await mammoth.convertToHtml({ arrayBuffer });
+            content = result.value;
+          } catch (e) {
+            console.error('Error parsing DOCX:', e);
+            content = await importFile.text(); // Fallback
+          }
+        } else {
+          content = await importFile.text();
+        }
+
         await onCreate(importFile.name.replace(/\.[^/.]+$/, ''), undefined, content);
       }
       console.log('Document creation completed');
