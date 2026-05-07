@@ -433,6 +433,12 @@ export default function SignupPage() {
                 Create your<br />account
               </h1>
               <p className="mt-2 text-[15px] text-[#64748B]">Free forever. No credit card required.</p>
+              <Link
+                href="/demo"
+                className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-[#0F172A]/10 bg-[#0F172A] text-[14px] font-bold text-white shadow-[0_8px_24px_rgba(15,23,42,0.18)] transition-all hover:-translate-y-0.5 hover:bg-[#1E293B]"
+              >
+                See demo
+              </Link>
 
               {error && (
                 <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
