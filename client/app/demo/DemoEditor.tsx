@@ -13,7 +13,7 @@ const CURSOR_PATHS = [
   { top: 228, left: 180 },
   { top: 305, left: 292 },
   { top: 365, left: 226 },
-  { top: 278, left: 382 },
+  { top: 250, left: 200 },
 ];
 const DEMO_TITLE = 'Project Roadmap 2026';
 const DEMO_DRAFT = `Q1 Goals:
@@ -184,8 +184,8 @@ export default function DemoEditor() {
                   )}
                 </div>
 
-                <FakeCursor color="#3b82f6" name="Sumit" visible position={{ top: 214, left: 138 }} label="You" />
-                <FakeCursor color="#ec4899" name="Priya" visible={timeline.secondCursor} position={cursorPosition} className="demo-css-cursor-priya" />
+                <FakeCursor color="#3b82f6" name="Sumit" visible position={{ top: 214, left: 138 }} label="You" mode="caret" />
+                <FakeCursor color="#ec4899" name="Priya" visible={timeline.secondCursor} position={cursorPosition} className="demo-css-cursor-priya" mode="pointer" />
                 <FakeComment visible={timeline.commentVisible} className="demo-css-comment" />
                 <FakeToolbar visible={timeline.toolbarVisible} clicked={timeline.toolbarClicked} className="demo-css-toolbar" />
 
