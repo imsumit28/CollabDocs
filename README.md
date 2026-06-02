@@ -1,6 +1,6 @@
 # CollabDocs
 
-![CollabDocs Banner](./client/public/banner.png)
+![CollabDocs Banner](./banner.png)
 
 [![Node.js](https://img.shields.io/badge/Node.js-20-green?logo=node.js)](https://nodejs.org)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)](https://nextjs.org)
