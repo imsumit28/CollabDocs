@@ -1,22 +1,29 @@
 import { Router, Response } from 'express';
-import Groq from 'groq-sdk';
+import OpenAI from 'openai';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { aiRateLimit } from '../middleware/rateLimit';
 
 const router = Router();
 router.use(authMiddleware, aiRateLimit);
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const MODEL = 'llama-3.3-70b-versatile';
+// DeepSeek exposes an OpenAI-compatible API, so we use the OpenAI SDK
+// pointed at DeepSeek's base URL.
+const deepseek = new OpenAI({
+  apiKey: process.env.DEEPSEEK_API_KEY,
+  baseURL: 'https://api.deepseek.com',
+});
+const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
 
-async function callGroq(systemPrompt: string, userContent: string): Promise<string> {
-  const completion = await groq.chat.completions.create({
+async function callAI(systemPrompt: string, userContent: string): Promise<string> {
+  const completion = await deepseek.chat.completions.create({
     model: MODEL,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userContent },
     ],
-    max_tokens: 1000,
+    // deepseek-v4-flash is a reasoning model: reasoning_content shares this
+    // budget with the answer, so keep it generous to avoid truncated output.
+    max_tokens: 4000,
     temperature: 0.7,
   });
   return completion.choices[0]?.message?.content?.trim() || '';
@@ -28,7 +35,7 @@ router.post('/improve', async (req: AuthRequest, res: Response) => {
   if (!text?.trim()) { res.status(400).json({ error: 'text is required' }); return; }
 
   try {
-    const result = await callGroq(
+    const result = await callAI(
       'You are a professional writing assistant. Rewrite the provided text to be clearer, more professional, and more concise. Return only the rewritten text with no preamble or explanation.',
       text
     );
@@ -44,7 +51,7 @@ router.post('/summarize', async (req: AuthRequest, res: Response) => {
   if (!content?.trim()) { res.status(400).json({ error: 'content is required' }); return; }
 
   try {
-    const result = await callGroq(
+    const result = await callAI(
       'You are a document summariser. Summarise the provided document content in exactly 3 clear, informative sentences. Return only the summary.',
       content
     );
@@ -60,7 +67,7 @@ router.post('/grammar', async (req: AuthRequest, res: Response) => {
   if (!text?.trim()) { res.status(400).json({ error: 'text is required' }); return; }
 
   try {
-    const result = await callGroq(
+    const result = await callAI(
       'You are a grammar and spelling corrector. Fix only grammar and spelling errors in the provided text. Do NOT change the style, tone, or content. Return only the corrected text.',
       text
     );
@@ -75,7 +82,7 @@ router.post('/expand', async (req: AuthRequest, res: Response) => {
   const { text } = req.body;
   if (!text?.trim()) { res.status(400).json({ error: 'text is required' }); return; }
   try {
-    const result = await callGroq(
+    const result = await callAI(
       'You are a writing assistant. Expand and elaborate on the provided text, adding more detail, examples, and explanation to make it more comprehensive. Return only the expanded text.',
       text
     );
@@ -90,7 +97,7 @@ router.post('/simplify', async (req: AuthRequest, res: Response) => {
   const { text } = req.body;
   if (!text?.trim()) { res.status(400).json({ error: 'text is required' }); return; }
   try {
-    const result = await callGroq(
+    const result = await callAI(
       'You are a writing assistant. Simplify the provided text using plain language, shorter sentences, and no jargon. Return only the simplified text.',
       text
     );
@@ -106,7 +113,7 @@ router.post('/tone', async (req: AuthRequest, res: Response) => {
   if (!text?.trim()) { res.status(400).json({ error: 'text is required' }); return; }
   if (!tone?.trim()) { res.status(400).json({ error: 'tone is required' }); return; }
   try {
-    const result = await callGroq(
+    const result = await callAI(
       `You are a writing assistant. Rewrite the provided text in a ${tone} tone. Preserve the meaning and key information. Return only the rewritten text.`,
       text
     );
@@ -121,7 +128,7 @@ router.post('/outline', async (req: AuthRequest, res: Response) => {
   const { content } = req.body;
   if (!content?.trim()) { res.status(400).json({ error: 'content is required' }); return; }
   try {
-    const result = await callGroq(
+    const result = await callAI(
       'You are a document assistant. Create a clear hierarchical outline with bullet points based on the provided content. Include main sections and key sub-points. Return only the outline.',
       content
     );
@@ -136,7 +143,7 @@ router.post('/brainstorm', async (req: AuthRequest, res: Response) => {
   const { content } = req.body;
   if (!content?.trim()) { res.status(400).json({ error: 'content is required' }); return; }
   try {
-    const result = await callGroq(
+    const result = await callAI(
       'You are a creative assistant. Based on the provided content, brainstorm 5-8 related ideas, next steps, or improvements. Format as a numbered list. Return only the ideas.',
       content
     );
@@ -152,7 +159,7 @@ router.post('/translate', async (req: AuthRequest, res: Response) => {
   if (!text?.trim()) { res.status(400).json({ error: 'text is required' }); return; }
   if (!language?.trim()) { res.status(400).json({ error: 'language is required' }); return; }
   try {
-    const result = await callGroq(
+    const result = await callAI(
       `You are a professional translator. Translate the provided text to ${language}. Return only the translated text.`,
       text
     );
@@ -167,7 +174,7 @@ router.post('/title', async (req: AuthRequest, res: Response) => {
   const { content } = req.body;
   if (!content?.trim()) { res.status(400).json({ error: 'content is required' }); return; }
   try {
-    const result = await callGroq(
+    const result = await callAI(
       'You are a writing assistant. Generate 3 compelling title or heading suggestions for the provided content. Format as a numbered list. Return only the titles.',
       content
     );

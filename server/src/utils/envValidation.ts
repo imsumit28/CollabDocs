@@ -36,9 +36,9 @@ const envVars: EnvVar[] = [
     validation: (val) => ['development', 'staging', 'production'].includes(val) ? true : 'Must be development, staging, or production',
   },
   {
-    name: 'GROQ_API_KEY',
+    name: 'DEEPSEEK_API_KEY',
     required: false,
-    validation: (val) => val.startsWith('gsk_') ? true : 'Invalid Groq API key format',
+    validation: (val) => val.startsWith('sk-') ? true : 'Invalid DeepSeek API key format',
   },
   {
     name: 'GOOGLE_CLIENT_ID',

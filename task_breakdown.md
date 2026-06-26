@@ -70,8 +70,8 @@ CollabDocs is a real-time collaborative document editor with AI writing assistan
 
 ## 3. AI Writing Assistant
 
-### 3.1 Groq Integration
-- [ ] Connect to Groq API (Llama 3.3 70B)
+### 3.1 DeepSeek Integration
+- [ ] Connect to DeepSeek API (OpenAI-compatible)
 - [ ] Implement request rate limiting
 - [ ] Add error handling for API failures
 - [ ] Cache common AI responses
@@ -221,7 +221,7 @@ CollabDocs is a real-time collaborative document editor with AI writing assistan
 - [ ] CommentService
 - [ ] SharingService
 - [ ] VersionService
-- [ ] AiService (Groq)
+- [ ] AiService (DeepSeek)
 - [ ] NotificationService
 
 ---
@@ -334,7 +334,7 @@ In Vercel Dashboard → Settings → Environment Variables, add:
 
 ```
 NEXT_PUBLIC_API_URL=https://api.collabdocs.app
-NEXT_PUBLIC_GROQ_API_KEY=(optional - for client-side AI features)
+NEXT_PUBLIC_DEEPSEEK_API_KEY=(optional - for client-side AI features)
 ```
 
 - [ ] Add environment variables
@@ -398,7 +398,8 @@ JWT_SECRET=your-jwt-secret-key-here
 JWT_EXPIRY=7d
 GOOGLE_OAUTH_ID=your-google-oauth-id
 GOOGLE_OAUTH_SECRET=your-google-oauth-secret
-GROQ_API_KEY=your-groq-api-key
+DEEPSEEK_API_KEY=your-deepseek-api-key
+DEEPSEEK_MODEL=deepseek-v4-flash
 REDIS_URL=your-upstash-redis-url
 CORS_ORIGIN=https://collabdocs.app,https://www.collabdocs.app
 NODE_OPTIONS=--max-old-space-size=512
@@ -646,8 +647,9 @@ JWT_EXPIRY=7d
 GOOGLE_OAUTH_ID=xxx.apps.googleusercontent.com
 GOOGLE_OAUTH_SECRET=your-google-secret
 
-# Groq AI
-GROQ_API_KEY=gsk_xxx
+# DeepSeek AI
+DEEPSEEK_API_KEY=sk-xxx
+DEEPSEEK_MODEL=deepseek-v4-flash
 
 # Redis (Upstash)
 REDIS_URL=redis://default:password@endpoint.upstash.io:port
@@ -664,7 +666,7 @@ LOG_LEVEL=info
 #### Client (.env.local)
 ```
 NEXT_PUBLIC_API_URL=https://api.collabdocs.app
-NEXT_PUBLIC_GROQ_API_KEY=(optional)
+NEXT_PUBLIC_DEEPSEEK_API_KEY=(optional)
 ```
 
 ---
@@ -781,7 +783,7 @@ If deployment causes issues:
 - [ ] Vercel account
 - [ ] Render account
 - [ ] Upstash Redis account
-- [ ] Groq API key
+- [ ] DeepSeek API key
 - [ ] Google OAuth credentials
 - [ ] Custom domains registered and managed with DNS provider
 
@@ -953,12 +955,12 @@ If deployment causes issues:
 ### Critical Dependencies
 - MongoDB Atlas setup (for data persistence)
 - Socket.IO Redis adapter (for horizontal scaling)
-- Groq API key (for AI features)
+- DeepSeek API key (for AI features)
 - Google Cloud project (for OAuth)
 - Vercel & Render accounts (for deployment)
 
 ### Known Blockers
-- Rate limiting on Groq API (free tier: 30 requests/min)
+- Rate limiting on DeepSeek API
 - MongoDB Atlas connection limits (free tier)
 - Socket.IO horizontal scaling requires Redis
 - Real-time collaboration requires persistent connections

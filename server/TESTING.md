@@ -310,7 +310,7 @@ Then open `chrome://inspect` in Chrome.
 - **Isolate tests** — Each test is independent, no reliance on test order
 - **Clean up after tests** — Use `afterEach` to delete test data
 - **Test error cases** — Missing fields, invalid auth, permission denied
-- **Mock external services** — Don't call Groq or real email service in tests
+- **Mock external services** — Don't call DeepSeek or real email service in tests
 
 ###  Don't
 
