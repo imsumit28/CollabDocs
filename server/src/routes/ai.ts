@@ -7,15 +7,27 @@ const router = Router();
 router.use(authMiddleware, aiRateLimit);
 
 // DeepSeek exposes an OpenAI-compatible API, so we use the OpenAI SDK
-// pointed at DeepSeek's base URL.
-const deepseek = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: 'https://api.deepseek.com',
-});
+// pointed at DeepSeek's base URL. The client is created lazily because the
+// OpenAI SDK throws on construction when no apiKey is present — DEEPSEEK_API_KEY
+// is optional, so we must not crash the server at boot when it's unset.
 const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
 
+let client: OpenAI | null = null;
+function getClient(): OpenAI {
+  if (!process.env.DEEPSEEK_API_KEY) {
+    throw new Error('DEEPSEEK_API_KEY is not configured');
+  }
+  if (!client) {
+    client = new OpenAI({
+      apiKey: process.env.DEEPSEEK_API_KEY,
+      baseURL: 'https://api.deepseek.com',
+    });
+  }
+  return client;
+}
+
 async function callAI(systemPrompt: string, userContent: string): Promise<string> {
-  const completion = await deepseek.chat.completions.create({
+  const completion = await getClient().chat.completions.create({
     model: MODEL,
     messages: [
       { role: 'system', content: systemPrompt },
