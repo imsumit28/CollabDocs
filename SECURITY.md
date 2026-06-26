@@ -42,7 +42,7 @@ CollabDocs is designed with security as a first-class concern. This document out
   
 - **AI endpoints** (`/ai/*`)
   - 30 requests per minute per user
-  - Prevents abuse of free Groq tier
+  - Prevents abuse of the DeepSeek API quota
 
 Implemented via `express-rate-limit` with Redis store for distributed rate limiting.
 

@@ -16,7 +16,7 @@ cp client/.env.example client/.env.local
 
 # Edit with your credentials (see env files for instructions)
 # - MongoDB Atlas (free, required)
-# - Groq API key (free, required for AI features)
+# - DeepSeek API key (required for AI features)
 # - Google OAuth credentials (optional)
 # - Upstash Redis (optional — for future horizontal scaling)
 

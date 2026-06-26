@@ -47,7 +47,7 @@ const MAX_AI_INPUT = 10000;
 ### 4. Missing Required Environment Variables Validation
 **Severity:** Medium
 **Location:** `server/src/routes/ai.ts` (line 9)
-**Issue:** GROQ_API_KEY only checked when request comes in, not at startup
+**Issue:** DEEPSEEK_API_KEY only checked when request comes in, not at startup
 **Fix:** Add startup validation in `server/src/index.ts`
 
 ### 5. Missing MongoDB ObjectId Validation
@@ -95,7 +95,7 @@ const requiredEnvVars = [
 ];
 
 const optionalEnvVars = [
-  'GROQ_API_KEY',
+  'DEEPSEEK_API_KEY',
   'REDIS_URL',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',

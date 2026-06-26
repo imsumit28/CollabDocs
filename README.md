@@ -40,7 +40,7 @@
 - **Auto-save** — Documents persist every 5 seconds of inactivity via debounced writes to MongoDB.
 
 **User Features**
-- **AI writing assistant** — Improve prose, fix grammar, or summarise documents. Powered by Groq (Llama 3.3 70B, free tier).
+- **AI writing assistant** — Improve prose, fix grammar, or summarise documents. Powered by DeepSeek (OpenAI-compatible API).
 - **Sharing** — Share documents via link with View or Edit permission levels.
 - **Export** — Download as PDF or DOCX.
 - **Authentication** — Email/password with JWT + Google OAuth.
@@ -82,7 +82,7 @@ graph TB
     end
 
     subgraph External["External Services"]
-        GR["Groq AI\nLlama 3.3 70B"]
+        GR["DeepSeek AI\n(OpenAI-compatible)"]
         GO["Google OAuth 2.0"]
     end
 
@@ -169,7 +169,7 @@ collabdocs/
 | **Database** | MongoDB (Mongoose) | Schema-flexible for documents/binary Y.js state |
 | **Cache/Scale** | Redis (Upstash) *(planned)* | Future horizontal scaling via Socket.IO pub/sub fan-out |
 | **Auth** | JWT (HS256), Google OAuth (Passport.js) | Stateless, XSS-safe token strategy |
-| **AI** | Groq API — Llama 3.3 70B | Free tier, fast inference |
+| **AI** | DeepSeek API (OpenAI-compatible) | Fast inference |
 | **Styling** | Tailwind CSS | Utility-first, consistent design tokens |
 | **Hosting** | Vercel + Render | Zero-config deploys from GitHub |
 
@@ -183,7 +183,7 @@ collabdocs/
 |---------|----------------|-----------|
 | Node.js 20+ | [nodejs.org](https://nodejs.org) | Yes |
 | MongoDB Atlas | [cloud.mongodb.com](https://cloud.mongodb.com) — free M0 cluster | Yes |
-| Groq API key | [console.groq.com](https://console.groq.com) — free tier | Yes (AI features) |
+| DeepSeek API key | [platform.deepseek.com](https://platform.deepseek.com) | Yes (AI features) |
 | Google Cloud project | [console.cloud.google.com](https://console.cloud.google.com) | Optional (OAuth only) |
 | Upstash Redis | [upstash.com](https://upstash.com) — free database | Optional (future scaling) |
 
@@ -216,8 +216,9 @@ MONGODB_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/collabdocs
 JWT_ACCESS_SECRET=<32-char-hex>
 JWT_REFRESH_SECRET=<32-char-hex>
 
-# Groq: copy from console.groq.com > API Keys
-GROQ_API_KEY=gsk_...
+# DeepSeek: copy from platform.deepseek.com > API Keys
+DEEPSEEK_API_KEY=sk-...
+DEEPSEEK_MODEL=deepseek-v4-flash
 
 # Google OAuth (optional): create at console.cloud.google.com > Credentials
 GOOGLE_CLIENT_ID=...apps.googleusercontent.com

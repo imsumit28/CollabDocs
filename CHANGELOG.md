@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Suggestions Mode** — Track Changes-style suggestions using custom TipTap extensions (no paid plan required)
 
 #### AI Features
-- **AI Writing Assistant** — Powered by Groq Llama 3.3 70B:
+- **AI Writing Assistant** — Powered by DeepSeek (OpenAI-compatible API):
   - Grammar and style improvements
   - Content summarization
   - Tone adjustment
@@ -59,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | Database | MongoDB Atlas (Mongoose ODM) |
 | Cache | Upstash Redis (@socket.io/redis-adapter) |
 | Auth | JWT (HS256), Google OAuth (Passport.js) |
-| AI | Groq API (Llama 3.3 70B) |
+| AI | DeepSeek API (OpenAI-compatible) |
 | Deployment | Vercel (frontend), Render (backend) |
 
 ---

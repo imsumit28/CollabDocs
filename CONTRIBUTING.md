@@ -12,7 +12,7 @@ We love your input! We want to make contributing to CollabDocs as easy and trans
 ### Prerequisites
 - Node.js 20+
 - MongoDB Atlas account (free tier)
-- Groq API key (free at console.groq.com)
+- DeepSeek API key (platform.deepseek.com)
 - Upstash Redis (optional — only needed for multi-instance scaling in the future)
 
 ### Getting Started
@@ -108,7 +108,7 @@ npm run test --workspace=client
 ### Test Standards
 - Aim for >60% code coverage on critical paths (auth, sync, persistence)
 - Use descriptive test names: `should sync edits across two clients in <100ms`
-- Mock external services (Groq, MongoDB) where appropriate
+- Mock external services (DeepSeek, MongoDB) where appropriate
 - Integration tests should use a test database
 
 ## Reporting Bugs

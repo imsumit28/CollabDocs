@@ -49,7 +49,7 @@ Validates all critical environment variables at server startup:
 - JWT_REFRESH_SECRET (32+ characters)
 - CLIENT_URL (valid URL format)
 - NODE_ENV (development/staging/production)
-- GROQ_API_KEY (optional, format check if present)
+- DEEPSEEK_API_KEY (optional, format check if present)
 - REDIS_URL (optional, format check if present)
 
 **Runs automatically on server startup** - If any required variable is missing or invalid, server exits with clear error message.
