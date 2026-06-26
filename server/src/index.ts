@@ -74,7 +74,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 const PORT = process.env.PORT || 4000;
 // ─── Self-Ping to prevent Render free-tier spin-down ─────────────────────────
 // Render spins down the server after 15 min of inactivity on the free tier.
-// This pings our own /health endpoint every 10 minutes to keep it alive.
+// This pings our own /health endpoint every 14 minutes to keep it alive.
 function startSelfPing() {
   const RENDER_URL = process.env.API_URL || `http://localhost:${PORT}`;
   const pingUrl = `${RENDER_URL}/health`;
@@ -88,13 +88,13 @@ function startSelfPing() {
     });
   };
 
-  // Wait 30s after startup before first ping, then every 10 minutes
+  // Wait 30s after startup before first ping, then every 14 minutes
   setTimeout(() => {
     ping();
-    setInterval(ping, 10 * 60 * 1000); // every 10 minutes
+    setInterval(ping, 14 * 60 * 1000); // every 14 minutes
   }, 30_000);
 
-  console.log(`[Self-Ping] Scheduled every 10 min → ${pingUrl}`);
+  console.log(`[Self-Ping] Scheduled every 14 min → ${pingUrl}`);
 }
 
 async function start() {
