@@ -2,6 +2,7 @@
 
 ![CollabDocs Banner](./banner.png)
 
+[![CI](https://github.com/imsumit28/CollabDocs/actions/workflows/ci.yml/badge.svg)](https://github.com/imsumit28/CollabDocs/actions/workflows/ci.yml)
 [![Node.js](https://img.shields.io/badge/Node.js-20-green?logo=node.js)](https://nodejs.org)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)](https://nextjs.org)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-brightgreen?logo=mongodb)](https://mongodb.com)
@@ -35,18 +36,24 @@
 - **Live co-editing** — Multiple users type simultaneously via Y.js CRDT + Socket.IO. Changes propagate in ~100ms with zero conflicts.
 - **Live cursors** — Each collaborator gets a unique colour cursor with their name label, updated in real time.
 - **Comments** — Inline comments anchored to text ranges, with reply threads and resolve/reopen flow.
+- **Notifications** — In-app notification bell for shares, comments, and @mentions (both in comments and typed `@username` in the document body), with unread badge and mark-as-read.
 - **Suggestions mode** — Track Changes-style mode built with free TipTap extensions. No paid Pro license required.
 - **Version history** — Browse and restore past snapshots of any document.
 - **Auto-save** — Documents persist every 5 seconds of inactivity via debounced writes to MongoDB.
+- **Offline & installable (PWA)** — Install to your home screen/desktop; opened documents stay editable offline (Y.js + IndexedDB) and merge automatically on reconnect. A service worker caches the app shell with an offline fallback page.
 
 **User Features**
-- **AI writing assistant** — Improve prose, fix grammar, or summarise documents. Powered by DeepSeek (OpenAI-compatible API).
-- **Sharing** — Share documents via link with View or Edit permission levels.
+- **AI writing assistant** — Improve prose, fix grammar, summarise, expand, simplify, shift tone, translate, outline, brainstorm, and generate titles. Responses **stream in token-by-token**. Powered by DeepSeek (OpenAI-compatible API).
+- **Sharing** — Invite specific people by email (View or Edit) — from either the editor or the dashboard — or share via link with View or Edit permission levels.
+- **Search** — Server-side search across all your documents by title *and* content (a plain-text mirror is kept in sync on save; run `npm run backfill:search` once to index documents created before this feature).
+- **Folders** — Organise your documents into folders from the sidebar; move docs in/out from the card menu. Deleting a folder keeps its documents (they return to root).
 - **Export** — Download as PDF or DOCX.
-- **Authentication** — Email/password with JWT + Google OAuth.
+- **Authentication** — Email/password with JWT + Google OAuth, email verification, and secure password reset (tokenised, single-use, 1-hour expiry).
+- **Account settings** — Update profile (name, username, avatar) and change password from a dedicated settings page.
 
 **Production-Ready**
-- **45+ tests** — Auth, documents, comments, and real-time sync covered at ~60% overall.
+- **173 server tests** — Auth, documents, folders, comments, versions, search, notifications, and real-time sync covered at ~70% overall, plus client component tests (Jest + React Testing Library) and browser E2E (Playwright).
+- **Structured logging** — Leveled JSON logs via pino (pretty-printed in dev), with HTTP request logging and secret redaction.
 - **Interactive API docs** — Swagger/OpenAPI UI at `/api/docs` with request examples.
 - **Security-first** — Rate limiting, input validation, CORS, Helmet headers, XSS/CSRF protection.
 - **Full TypeScript** — End-to-end type safety across client and server.
@@ -167,9 +174,10 @@ collabdocs/
 | **Real-Time** | Socket.IO 4, Y.js | CRDT sync + WebSocket transport |
 | **Backend** | Node.js, Express, TypeScript | Familiar, fast, type-safe |
 | **Database** | MongoDB (Mongoose) | Schema-flexible for documents/binary Y.js state |
-| **Cache/Scale** | Redis (Upstash) *(planned)* | Future horizontal scaling via Socket.IO pub/sub fan-out |
+| **Cache/Scale** | Redis (Upstash) *(optional)* | Socket.IO event fan-out across instances (not full multi-instance Y.Doc scaling — see Design Decisions) |
 | **Auth** | JWT (HS256), Google OAuth (Passport.js) | Stateless, XSS-safe token strategy |
 | **AI** | DeepSeek API (OpenAI-compatible) | Fast inference |
+| **Logging** | pino + pino-http | Structured leveled JSON logs (pretty in dev), aggregator-friendly |
 | **Styling** | Tailwind CSS | Utility-first, consistent design tokens |
 | **Hosting** | Vercel + Render | Zero-config deploys from GitHub |
 
@@ -276,9 +284,9 @@ The central architecture question for any collaborative editor is: how do you me
 | Conflict resolution | Server serialises all ops, transforms concurrent ones | Each client merges independently — always converges |
 | Server role | Central arbiter required | Dumb relay — no conflict logic needed |
 | Offline support | Hard — requires reconnect protocol | Built-in — merge on reconnect automatically |
-| Horizontal scaling | Difficult without sticky sessions | Trivial — any server can relay any delta |
+| Horizontal scaling | Difficult without sticky sessions | Easier in principle — deltas are commutative — though this app's server still holds per-instance state (see note below) |
 
-**Why CRDT:** The server becomes a dumb relay. It applies deltas to an in-memory `Y.Doc` and broadcasts them. No conflict resolution logic on the server means the backend is stateless enough to scale horizontally.
+**Why CRDT:** The server is mostly a relay. It applies deltas to an in-memory `Y.Doc` and broadcasts them, with no conflict-resolution logic. The CRDT model *makes* horizontal scaling tractable (deltas commute, so order doesn't matter), but this implementation still keeps an authoritative `Y.Doc` per instance for persistence — so it targets a single backend instance today. See [Design Decision 4](#4-single-instance-real-time-with-a-redis-adapter-for-event-fan-out) for what multi-instance would require.
 
 **How conflicts resolve in practice:**
 
@@ -314,11 +322,19 @@ CollabDocs instead keeps a per-room `Y.Doc` in memory and resets a 5-second debo
 
 ---
 
-### 4. Redis adapter for horizontal Socket.IO scaling *(planned)*
+### 4. Single-instance real-time, with a Redis adapter for event fan-out
 
-Socket.IO's in-process room registry breaks the moment you have more than one backend instance — a user on server A won't see events from server B.
+The app is designed to run as a **single backend instance** (Render free tier), and that's the configuration it's correct for.
 
-The `@socket.io/redis-adapter` is already integrated in the codebase and activates automatically when `REDIS_URL` is set. Currently the app runs on a single Render instance (free tier), so Redis is not required. When scaling to multiple instances in the future, simply add a `REDIS_URL` env var — no code changes needed.
+`@socket.io/redis-adapter` is integrated and activates automatically when `REDIS_URL` is set. It solves *one* part of multi-instance scaling — Socket.IO event fan-out, so presence and relayed updates reach sockets connected to other instances.
+
+**It does not, by itself, make the app safe to run on multiple instances.** Each instance keeps its own authoritative `Y.Doc` for a document in memory and only applies the updates from sockets connected to *that* instance, then debounce-persists the whole state to MongoDB. With two instances editing the same document, their in-memory copies diverge and the periodic save becomes last-writer-wins — edits can be lost.
+
+True horizontal scaling would require one of:
+- **Sticky routing per document** (all sockets for a given doc land on the same instance), or
+- **A shared Y.js persistence/sync layer** (e.g. a dedicated y-websocket/y-redis service that owns the authoritative document) so no single app instance holds private state.
+
+Both are out of scope for the free single-instance deployment; this is called out honestly rather than claimed as "scale by adding an env var."
 
 ---
 
@@ -336,15 +352,32 @@ npm run test:watch --workspace=server        # Watch mode
 npm run test:ci --workspace=server           # CI mode (strict coverage threshold)
 ```
 
-| Module | Coverage | Test Cases |
-|--------|----------|-----------|
-| Auth Routes | ~75% | 12 |
-| Document Routes | ~72% | 15 |
-| Comment Routes | ~65% | 10 |
-| WebSocket Sync | ~45% | 8 |
-| **Overall** | **~60%** | **45+** |
+**Server** tests run against an in-memory MongoDB (`mongodb-memory-server`) — no local database or paid cluster required, so the suite runs offline and in CI out of the box. **Client** tests use Jest + React Testing Library (via `next/jest`), and **end-to-end** tests use Playwright with all API calls mocked via route interception (no backend or DB needed — deterministic and free).
 
-Tests cover: signup/login/refresh/logout, document CRUD and access control, comment creation/replies/resolution, Y.js CRDT concurrent edits and offline merges, rate limiting, and input validation.
+```bash
+npm run test:ci --workspace=client   # Client component tests
+npm run test:e2e --workspace=client  # Playwright E2E (auto-starts the app)
+```
+
+| Module | Test Cases |
+|--------|-----------|
+| Auth Routes | 33 |
+| Document Routes | 35 |
+| Folder Routes | 11 |
+| Comment Routes | 19 |
+| Version Routes | 10 |
+| Export Routes | 5 |
+| AI (validation + streaming) | 8 |
+| Document access (authz) | 9 |
+| Notifications (routes + mentions) | 13 |
+| Search backfill | 5 |
+| Env / health | 10 |
+| WebSocket / CRDT + API docs | ~15 |
+| **Server overall** | **173 tests · ~70% coverage** |
+| Client (Jest) | 7 |
+| End-to-end (Playwright) | 5 |
+
+Tests cover: signup/login/refresh/logout, document CRUD/pagination and access control, folders (create/rename/delete, move, folder-scoped listing), comment authorization, share-token permission resolution, version snapshot/restore, PDF/DOCX export, AI input-length limits + streaming, in-document and comment @mention notifications, the content-search backfill, env/health checks, Y.js CRDT concurrent edits and offline merges, plus browser E2E for the login and password-reset flows.
 
 See [server/TESTING.md](server/TESTING.md) for the full testing guide.
 
@@ -361,19 +394,34 @@ Interactive Swagger UI available at `http://localhost:4000/api/docs` when the se
 | `POST` | `/api/auth/signup` | Create account |
 | `POST` | `/api/auth/login` | Login, receive access token + refresh cookie |
 | `GET` | `/api/auth/me` | Current user profile |
+| `PATCH` | `/api/auth/me` | Update display name, username, or avatar |
+| `POST` | `/api/auth/change-password` | Change password (verifies current, re-issues session) |
 | `POST` | `/api/auth/refresh` | Exchange refresh cookie for new access token |
-| `GET` | `/api/documents` | List owned + shared documents |
+| `POST` | `/api/auth/forgot-password` | Request a password-reset email (generic response — no account enumeration) |
+| `POST` | `/api/auth/reset-password` | Set a new password using a valid reset token |
+| `GET` | `/api/documents` | List owned + shared documents (add `?page=N&limit=M` for a `{ items, total, page, totalPages, hasMore }` envelope; omit for the full array) |
+| `GET` | `/api/documents/search?q=` | Search owned + shared docs by title and content |
 | `POST` | `/api/documents` | Create document |
 | `GET` | `/api/documents/:id` | Get document content |
-| `PATCH` | `/api/documents/:id` | Update title |
+| `PATCH` | `/api/documents/:id` | Update title and/or move to a folder (`{ folderId }`, owner only; `null` = root) |
 | `DELETE` | `/api/documents/:id` | Soft-delete (trash) |
 | `POST` | `/api/documents/:id/share` | Generate share link |
+| `GET` | `/api/documents/:id/collaborators` | List people with access (owner + collaborators) |
+| `POST` | `/api/documents/:id/collaborators` | Invite/update a collaborator by email (owner only) |
+| `DELETE` | `/api/documents/:id/collaborators/:userId` | Remove a collaborator (owner only) |
+| `GET` | `/api/folders` | List my folders with document counts |
+| `POST` | `/api/folders` | Create a folder |
+| `PATCH` | `/api/folders/:id` | Rename a folder (owner only) |
+| `DELETE` | `/api/folders/:id` | Delete a folder (its documents return to root) |
 | `GET` | `/api/versions/:docId` | List document versions |
 | `POST` | `/api/versions/:docId` | Save named snapshot |
 | `POST` | `/api/comments` | Add inline comment |
 | `GET` | `/api/comments/:docId` | List comments |
 | `PATCH` | `/api/comments/:id/resolve` | Resolve comment |
-| `POST` | `/api/ai/assist` | AI writing assistance |
+| `GET` | `/api/notifications` | List my notifications + unread count |
+| `PATCH` | `/api/notifications/:id/read` | Mark a notification read |
+| `POST` | `/api/notifications/read-all` | Mark all my notifications read |
+| `POST` | `/api/ai/{improve,grammar,summarize,expand,simplify,tone,outline,brainstorm,translate,title}` | AI writing actions. Add `?stream=1` to stream the response as plain-text chunks; otherwise returns `{ result }` |
 | `POST` | `/api/export/:id/pdf` | Export as PDF |
 | `POST` | `/api/export/:id/docx` | Export as DOCX |
 
@@ -381,9 +429,10 @@ Interactive Swagger UI available at `http://localhost:4000/api/docs` when the se
 
 | Event | Direction | Description |
 |-------|-----------|-------------|
-| `doc:join` | client → server | Join a document room |
+| `doc:join` | client → server | Join a document room. Payload `{ docId, shareToken? }` — `shareToken` is required for link-based access by non-collaborators and is verified against the document's active share link. |
+| `doc:permission` | server → client | The joining user's authorized permission (`owner` / `edit` / `view`). Viewers receive a read-only editor and their `yjs:update` writes are rejected server-side. |
 | `yjs:sync` | server → client | Full Y.Doc state on join |
-| `yjs:update` | bidirectional | Binary Y.js delta (keystroke) |
+| `yjs:update` | bidirectional | Binary Y.js delta (keystroke). Only relayed/applied for participants with edit access. |
 | `doc:awareness` | bidirectional | Cursor position + user presence |
 | `doc:saved` | server → client | Persistence confirmation |
 
@@ -400,6 +449,9 @@ See [server/API.md](server/API.md) for curl examples and full schema documentati
 - **bcryptjs** — Passwords hashed with 12 salt rounds.
 - **CORS** — Restricted to configured `CLIENT_URL` origin.
 - **Environment validation** — Server refuses to start if required secrets are missing or too short.
+- **Email verification enforcement** — Optional (`REQUIRE_EMAIL_VERIFICATION=true`): unverified password accounts can't log in. OAuth accounts are always verified.
+- **Graceful shutdown** — On `SIGTERM`/`SIGINT` the server persists every open document room before exiting, so edits within the debounce window survive a deploy/restart.
+- **DB-aware health check** — `/health` returns `503` when the database is unreachable so load balancers and uptime monitors can detect a degraded instance.
 
 See [SECURITY.md](SECURITY.md) for threat model, hardening checklist, and incident reporting.
 
@@ -432,6 +484,7 @@ NODE_ENV=production
 PASSWORD_MIN_LENGTH=12
 PASSWORD_REQUIRE_UPPERCASE=true
 PASSWORD_REQUIRE_NUMBERS=true
+REQUIRE_EMAIL_VERIFICATION=true   # once SMTP_* is configured
 ```
 
 ---
@@ -449,6 +502,8 @@ npm run test --workspace=server   # Run tests
 ```
 
 Pre-commit hooks (Husky + lint-staged) run ESLint and Prettier automatically.
+
+Every push and pull request to `main` runs the [CI workflow](.github/workflows/ci.yml): type-check, lint, the full server test suite (with coverage, against an in-memory MongoDB), and a production client build.
 
 ---
 
