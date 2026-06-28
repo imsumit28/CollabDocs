@@ -8,3 +8,10 @@ dist/
 *.log
 .DS_Store
 coverage/
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Local Claude settings
+.claude/
