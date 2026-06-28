@@ -80,7 +80,7 @@
   - Serve OpenAPI JSON at `GET /api/docs/swagger.json`
 
 #### Comprehensive API Documentation
-- **`server/API.md`** (500+ lines)
+- **`API.md`** (500+ lines)
   - Complete REST API reference
   - All 25+ endpoints documented
   - Request/response examples with JSON
@@ -94,7 +94,7 @@
 
 ### 3. **Testing Documentation**
 
-- **`server/TESTING.md`** (350+ lines)
+- **`TESTING.md`** (350+ lines)
   - Quick start guide
   - Test structure and organization
   - Coverage goals and current status
@@ -163,9 +163,9 @@ After running tests, check `server/coverage/lcov-report/index.html` for detailed
 
 ### 5. Update Docs Links
 - Update **README.md** to link to:
-  - Testing guide: [TESTING.md](server/TESTING.md)
+  - Testing guide: [TESTING.md](TESTING.md)
   - API docs: See `/api/docs` endpoint in running server
-  - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
+  - Contributing: [CONTRIBUTING.md](../CONTRIBUTING.md)
 
 ---
 
@@ -202,8 +202,8 @@ After running tests, check `server/coverage/lcov-report/index.html` for detailed
 
 ### Testing & API Docs
 10. `server/jest.config.js` — Jest configuration
-11. `server/API.md` — Complete API reference (500+ lines)
-12. `server/TESTING.md` — Testing guide (350+ lines)
+11. `API.md` — Complete API reference (500+ lines)
+12. `TESTING.md` — Testing guide (350+ lines)
 13. `server/src/swagger.ts` — OpenAPI spec definition
 14. `server/src/__tests__/setup.ts` — Test setup
 15. `server/src/__tests__/helpers.ts` — Test utilities

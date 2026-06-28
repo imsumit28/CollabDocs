@@ -157,4 +157,4 @@ backward-incompatible ways (see **Changed / Breaking**), so this is a major bump
 - CORS restricted to configured origins
 - JWT verified on every Socket.IO connection
 
-See [SECURITY.md](SECURITY.md) for full security documentation.
+See [SECURITY.md](../SECURITY.md) for full security documentation.
