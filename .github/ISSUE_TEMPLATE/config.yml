@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Questions & Discussions
+    url: https://github.com/imsumit28/CollabDocs/discussions
+    about: Ask questions, share ideas, and discuss the project with the community.
+  - name: 📖 Documentation
+    url: https://github.com/imsumit28/CollabDocs/tree/main/docs
+    about: Setup, API reference, and testing guides live in the docs/ hub.
+  - name: 🔒 Report a security vulnerability
+    url: https://github.com/imsumit28/CollabDocs/blob/main/SECURITY.md
+    about: Please report security issues privately per our security policy — do not open a public issue.
