@@ -27,6 +27,10 @@
 - [API Reference](#api-reference)
 - [Security](#security)
 - [Deployment](#deployment)
+- [Documentation](#documentation)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
@@ -150,17 +154,21 @@ collabdocs/
 │   ├── contexts/              # AuthContext, ToastContext
 │   └── lib/                   # API client, Socket.IO singleton, Y.js provider
 │
-└── server/                    # Node.js + Express backend
+├── server/                    # Node.js + Express backend
+│   └── src/
+│       ├── routes/           # auth, documents, versions, ai, export, comments
+│       ├── socket/           # Socket.IO server + Y.js sync engine
+│       ├── models/           # Mongoose schemas (User, Document, Comment, Version)
+│       ├── middleware/       # JWT auth, rate limiting
+│       ├── utils/            # JWT helpers, validation, env validation
+│       ├── swagger.ts        # OpenAPI 3.0 spec
+│       └── __tests__/        # Jest test suites
+│
+└── docs/                      # Documentation hub
     ├── API.md                 # Complete REST API reference
     ├── TESTING.md             # Testing guide
-    └── src/
-        ├── routes/            # auth, documents, versions, ai, export, comments
-        ├── socket/            # Socket.IO server + Y.js sync engine
-        ├── models/            # Mongoose schemas (User, Document, Comment, Version)
-        ├── middleware/        # JWT auth, rate limiting
-        ├── utils/             # JWT helpers, validation, env validation
-        ├── swagger.ts         # OpenAPI 3.0 spec
-        └── __tests__/         # Jest test suites
+    ├── QUICK_START.md         # Fast local setup
+    └── CHANGELOG.md           # Version history
 ```
 
 ---
@@ -379,7 +387,7 @@ npm run test:e2e --workspace=client  # Playwright E2E (auto-starts the app)
 
 Tests cover: signup/login/refresh/logout, document CRUD/pagination and access control, folders (create/rename/delete, move, folder-scoped listing), comment authorization, share-token permission resolution, version snapshot/restore, PDF/DOCX export, AI input-length limits + streaming, in-document and comment @mention notifications, the content-search backfill, env/health checks, Y.js CRDT concurrent edits and offline merges, plus browser E2E for the login and password-reset flows.
 
-See [server/TESTING.md](server/TESTING.md) for the full testing guide.
+See [docs/TESTING.md](docs/TESTING.md) for the full testing guide.
 
 ---
 
@@ -436,7 +444,7 @@ Interactive Swagger UI available at `http://localhost:4000/api/docs` when the se
 | `doc:awareness` | bidirectional | Cursor position + user presence |
 | `doc:saved` | server → client | Persistence confirmation |
 
-See [server/API.md](server/API.md) for curl examples and full schema documentation.
+See [docs/API.md](docs/API.md) for curl examples and full schema documentation.
 
 ---
 
@@ -486,6 +494,36 @@ PASSWORD_REQUIRE_UPPERCASE=true
 PASSWORD_REQUIRE_NUMBERS=true
 REQUIRE_EMAIL_VERIFICATION=true   # once SMTP_* is configured
 ```
+
+---
+
+## Documentation
+
+All project documentation lives in the [`docs/`](docs/) hub:
+
+| Document | What's inside |
+|----------|---------------|
+| [Quick Start](docs/QUICK_START.md) | Fastest path to a running local instance |
+| [API Reference](docs/API.md) | Every REST endpoint with curl examples and schemas |
+| [Testing Guide](docs/TESTING.md) | How the test suites are organized and how to run them |
+| [Changelog](docs/CHANGELOG.md) | Version history and notable changes |
+
+Project policies live at the root: [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security Policy](SECURITY.md) · [License](LICENSE).
+
+---
+
+## Roadmap
+
+CollabDocs is feature-complete for its core use case. Planned enhancements, roughly in priority order:
+
+- [ ] **True horizontal scaling** — replace the per-instance in-memory Y.Doc with a shared `y-websocket`/`y-redis` sync layer so document state is consistent across multiple backend instances (today the Redis adapter only fans out Socket.IO events — see [Design Decisions](#design-decisions)).
+- [ ] **Anonymous share-link access** — let link-only visitors read documents and comments over REST (currently share tokens are honored on the WebSocket join but REST endpoints still require an account).
+- [ ] **Inline @mention autocomplete** — a TipTap mention dropdown in the editor; today in-document mentions are detected from typed `@handle` text.
+- [ ] **Transactional email provider** — wire a real SMTP/email service for verification and password-reset mail (development currently logs the link to the console).
+- [ ] **Nested folders** — multi-level folder hierarchy (folders are flat/single-level today).
+- [ ] **Raster PWA icons** — add 192px/512px PNG icons for broader install support across platforms.
+
+Have an idea? Open a [Discussion](https://github.com/imsumit28/CollabDocs/discussions) or a feature request.
 
 ---
 
