@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { logger } from '../utils/logger';
 
 export async function connectDB(): Promise<void> {
   const uri = process.env.MONGODB_URI;
@@ -8,11 +9,11 @@ export async function connectDB(): Promise<void> {
   while (retries > 0) {
     try {
       await mongoose.connect(uri);
-      console.log('✅ MongoDB connected');
+      logger.info('MongoDB connected');
       return;
     } catch (err) {
       retries--;
-      console.error(`MongoDB connection failed. Retries left: ${retries}`, err);
+      logger.error({ err, retries }, 'MongoDB connection failed');
       if (retries === 0) throw err;
       await new Promise(r => setTimeout(r, 3000));
     }
@@ -20,5 +21,5 @@ export async function connectDB(): Promise<void> {
 }
 
 mongoose.connection.on('disconnected', () => {
-  console.warn('⚠️ MongoDB disconnected');
+  logger.warn('MongoDB disconnected');
 });

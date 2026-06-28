@@ -4,6 +4,10 @@ import { createAdapter } from '@socket.io/redis-adapter';
 import Redis from 'ioredis';
 import { verifyAccessToken } from '../utils/jwt';
 import { CollabDocument } from '../models';
+import { resolveJoinPermission, canEdit, DocPermission } from '../utils/documentAccess';
+import { plainTextFromDoc } from '../utils/yjsText';
+import { notifyDocumentMentions } from '../utils/notifications';
+import { logger } from '../utils/logger';
 import * as Y from 'yjs';
 
 // ─── Y.Doc room registry ──────────────────────────────────────────────────────
@@ -49,8 +53,18 @@ async function flushAndClean(docId: string) {
   if (!room) return;
   if (room.saveTimer) clearTimeout(room.saveTimer);
   const state = Y.encodeStateAsUpdate(room.doc);
-  await CollabDocument.findByIdAndUpdate(docId, { yjsState: Buffer.from(state) });
+  await CollabDocument.findByIdAndUpdate(docId, {
+    yjsState: Buffer.from(state),
+    contentText: plainTextFromDoc(room.doc),
+  });
   docRooms.delete(docId);
+}
+
+// Persist every open room — called on graceful shutdown so in-flight edits that
+// haven't hit the 1.5 s debounce window aren't lost when the process exits.
+export async function flushAllRooms(): Promise<void> {
+  const docIds = Array.from(docRooms.keys());
+  await Promise.allSettled(docIds.map((docId) => flushAndClean(docId)));
 }
 
 // ─── Main Socket init ─────────────────────────────────────────────────────────
@@ -75,11 +89,11 @@ export function initSocket(server: HTTPServer): SocketServer {
       Promise.all([pub.connect(), sub.connect()])
         .then(() => {
           io.adapter(createAdapter(pub as any, sub as any));
-          console.log('✅ Socket.IO Redis adapter connected');
+          logger.info('Socket.IO Redis adapter connected');
         })
-        .catch(() => console.warn('⚠️ Redis not available, using in-memory adapter'));
+        .catch(() => logger.warn('Redis not available, using in-memory adapter'));
     } catch {
-      console.warn('⚠️ Redis not available, using in-memory adapter');
+      logger.warn('Redis not available, using in-memory adapter');
     }
   }
 
@@ -99,23 +113,24 @@ export function initSocket(server: HTTPServer): SocketServer {
     const user = socket.data.user;
     // Track which doc rooms this socket has joined for disconnect cleanup
     const joinedRooms = new Set<string>();
+    // Track this socket's permission per room so we can enforce read-only access
+    const roomPermissions = new Map<string, DocPermission>();
 
-    console.log(`🔌 Connected: ${user.displayName} (${socket.id})`);
+    logger.debug({ user: user.displayName, socketId: socket.id }, 'Socket connected');
 
     // ─── Join document room ────────────────────────────────────────────────────
-    socket.on('doc:join', async ({ docId }: { docId: string }) => {
+    socket.on('doc:join', async ({ docId, shareToken }: { docId: string; shareToken?: string }) => {
       try {
         const dbDoc = await CollabDocument.findById(docId);
         if (!dbDoc) return socket.emit('error', { message: 'Document not found' });
 
-        const isAuthorized =
-          dbDoc.ownerId.toString() === user.sub ||
-          dbDoc.collaborators.some((c: any) => c.userId.toString() === user.sub) ||
-          !!dbDoc.shareLink;
-        if (!isAuthorized) return socket.emit('error', { message: 'Access denied' });
+        const permission = resolveJoinPermission(dbDoc, user.sub, shareToken);
+        if (!permission) return socket.emit('error', { message: 'Access denied' });
 
         socket.join(docId);
         joinedRooms.add(docId);
+        roomPermissions.set(docId, permission);
+        socket.emit('doc:permission', { docId, permission });
 
         // Initialise Y.Doc for this room
         if (!docRooms.has(docId)) {
@@ -142,6 +157,9 @@ export function initSocket(server: HTTPServer): SocketServer {
       const room = docRooms.get(docId);
       if (!room) return;
 
+      // Enforce write access — view-only participants cannot mutate the document
+      if (!canEdit(roomPermissions.get(docId) ?? null)) return;
+
       const uint8 = new Uint8Array(Buffer.from(update, 'base64'));
       Y.applyUpdate(room.doc, uint8);
       socket.to(docId).emit('yjs:update', { update });
@@ -149,8 +167,19 @@ export function initSocket(server: HTTPServer): SocketServer {
       if (room.saveTimer) clearTimeout(room.saveTimer);
       room.saveTimer = setTimeout(async () => {
         const state = Y.encodeStateAsUpdate(room.doc);
-        await CollabDocument.findByIdAndUpdate(docId, { yjsState: Buffer.from(state) });
+        const text = plainTextFromDoc(room.doc);
+        await CollabDocument.findByIdAndUpdate(docId, {
+          yjsState: Buffer.from(state),
+          contentText: text,
+        });
         io.to(docId).emit('doc:saved', { timestamp: new Date().toISOString() });
+        // Notify anyone newly @mentioned in the document body (best-effort).
+        await notifyDocumentMentions({
+          documentId: docId,
+          actorId: user.sub,
+          actorName: user.displayName,
+          text,
+        });
       }, 1500);
     });
 
@@ -183,6 +212,7 @@ export function initSocket(server: HTTPServer): SocketServer {
     socket.on('doc:leave', async ({ docId }: { docId: string }) => {
       socket.leave(docId);
       joinedRooms.delete(docId);
+      roomPermissions.delete(docId);
 
       const remaining = await io.in(docId).fetchSockets();
       if (remaining.length === 0) {
@@ -193,7 +223,7 @@ export function initSocket(server: HTTPServer): SocketServer {
 
     // ─── Disconnect — treat as leaving all joined rooms ────────────────────────
     socket.on('disconnect', async () => {
-      console.log(`🔌 Disconnected: ${user.displayName}`);
+      logger.debug({ user: user.displayName }, 'Socket disconnected');
       // Socket.IO already removed this socket from all rooms before 'disconnect' fires.
       // fetchSockets() will not include this socket, so presence lists are already clean.
       for (const docId of joinedRooms) {
