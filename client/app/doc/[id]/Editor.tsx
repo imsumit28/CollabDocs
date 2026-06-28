@@ -12,6 +12,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
 import * as Y from 'yjs';
+import { IndexeddbPersistence } from 'y-indexeddb';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { getSocket } from '../../../lib/socket';
@@ -535,13 +536,56 @@ function AiPanel({ editor, onClose }: { editor: any; onClose: () => void }) {
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
+  // Stream the AI response token-by-token via fetch (axios can't read a
+  // streaming body in the browser). Retries once after refreshing the access
+  // token on a 401, mirroring the axios interceptor.
+  const streamFetch = async (endpoint: string, payload: Record<string, string>): Promise<Response> => {
+    const base = process.env.NEXT_PUBLIC_API_URL;
+    const doFetch = () =>
+      fetch(`${base}/api/ai/${endpoint}?stream=1`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(api.defaults.headers.common['Authorization']
+            ? { Authorization: api.defaults.headers.common['Authorization'] as string }
+            : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+
+    let res = await doFetch();
+    if (res.status === 401) {
+      try {
+        const r = await api.post('/auth/refresh', {}, { timeout: 5000 });
+        api.defaults.headers.common['Authorization'] = `Bearer ${r.data.accessToken}`;
+        res = await doFetch();
+      } catch { /* fall through — handled by caller */ }
+    }
+    return res;
+  };
+
   const call = async (endpoint: string, payload: Record<string, string>, label: string) => {
     setLoading(true); setError(''); setResult(''); setActiveAction(label); setExpanded(null);
     try {
-      const res = await api.post(`/ai/${endpoint}`, payload);
-      setResult(res.data.result);
+      const res = await streamFetch(endpoint, payload);
+      if (!res.ok || !res.body) {
+        let msg = 'AI request failed';
+        try { msg = (await res.json()).error || msg; } catch { /* non-JSON error */ }
+        throw new Error(msg);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        setResult(acc);
+      }
+      setResult(acc.trim());
     } catch (e: any) {
-      setError(e.response?.data?.error || 'AI request failed');
+      setError(e.message || 'AI request failed');
     } finally {
       setLoading(false);
     }
@@ -796,11 +840,30 @@ function ShareModal({ docId, onClose, toast }: { docId: string; onClose: () => v
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
 
+  // People with access (collaborators invited by email)
+  interface Person { userId: string; email: string | null; displayName: string | null; avatarUrl: string | null; permission: 'view' | 'edit'; }
+  const [people, setPeople] = useState<Person[]>([]);
+  const [ownerInfo, setOwnerInfo] = useState<{ userId: string; displayName: string | null; email: string | null } | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [invitePerm, setInvitePerm] = useState<'view' | 'edit'>('view');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState('');
+
+  const fetchPeople = async () => {
+    try {
+      const res = await api.get(`/docs/${docId}/collaborators`);
+      setPeople(res.data.collaborators || []);
+      setOwnerInfo(res.data.owner || null);
+    } catch { /* non-fatal — link sharing still works */ }
+  };
+
   useEffect(() => {
     setInitLoading(true);
     api.get(`/docs/${docId}`)
       .then((res) => {
         const doc = res.data.document;
+        setIsOwner(res.data.permission === 'owner');
         if (doc.shareLink) {
           setEnabled(true);
           setPermission(doc.shareLinkPermission || 'view');
@@ -809,7 +872,45 @@ function ShareModal({ docId, onClose, toast }: { docId: string; onClose: () => v
       })
       .catch(() => setError('Failed to load document settings.'))
       .finally(() => setInitLoading(false));
-  }, [docId]);
+    fetchPeople();
+  }, [docId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const invite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail.trim()) return;
+    setInviteLoading(true);
+    setInviteError('');
+    try {
+      const res = await api.post(`/docs/${docId}/collaborators`, { email: inviteEmail.trim(), permission: invitePerm });
+      setPeople(res.data.collaborators || []);
+      setInviteEmail('');
+      toast.success('Invitation added');
+    } catch (e: any) {
+      setInviteError(e.response?.data?.error || 'Could not add that person');
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const changePersonPermission = async (email: string | null, perm: 'view' | 'edit') => {
+    if (!email) return;
+    try {
+      const res = await api.post(`/docs/${docId}/collaborators`, { email, permission: perm });
+      setPeople(res.data.collaborators || []);
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || 'Could not update permission');
+    }
+  };
+
+  const removePerson = async (userId: string) => {
+    try {
+      const res = await api.delete(`/docs/${docId}/collaborators/${userId}`);
+      setPeople(res.data.collaborators || []);
+      toast.success('Removed');
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || 'Could not remove person');
+    }
+  };
 
   const apply = async (newEnabled: boolean, newPermission: 'view' | 'edit') => {
     setLoading(true);
@@ -923,6 +1024,90 @@ function ShareModal({ docId, onClose, toast }: { docId: string; onClose: () => v
             Enable sharing to generate a link
           </p>
         )}
+
+        {/* People with access */}
+        <div className="mt-6 pt-5 border-t border-[rgba(0,0,0,0.08)]">
+          <p className="text-[14px] font-semibold text-[#1D1D1F] mb-3">People with access</p>
+
+          {isOwner && (
+            <form onSubmit={invite} className="mb-3">
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => { setInviteEmail(e.target.value); setInviteError(''); }}
+                  placeholder="Invite by email"
+                  aria-label="Invite by email"
+                  className="input-apple text-[13px] flex-1"
+                />
+                <select
+                  value={invitePerm}
+                  onChange={(e) => setInvitePerm(e.target.value as 'view' | 'edit')}
+                  aria-label="Invite permission"
+                  className="text-[13px] rounded-[8px] border border-[rgba(0,0,0,0.12)] px-2 bg-white text-[#3A3A3C]"
+                >
+                  <option value="view">Can view</option>
+                  <option value="edit">Can edit</option>
+                </select>
+                <button type="submit" disabled={inviteLoading || !inviteEmail.trim()} className="btn-primary px-4 text-[13px] disabled:opacity-50">
+                  {inviteLoading ? '…' : 'Invite'}
+                </button>
+              </div>
+              {inviteError && <p className="text-[12px] text-[#FF3B30] mt-1.5 font-medium">{inviteError}</p>}
+            </form>
+          )}
+
+          <div className="space-y-1.5 max-h-[180px] overflow-y-auto">
+            {/* Owner row */}
+            {ownerInfo && (
+              <div className="flex items-center gap-2.5 py-1.5">
+                <div className="w-7 h-7 rounded-full bg-[#007AFF] text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0">
+                  {(ownerInfo.displayName || ownerInfo.email || '?').charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-[#1D1D1F] truncate">{ownerInfo.displayName || ownerInfo.email}</p>
+                  <p className="text-[11px] text-[#8E8E93] truncate">{ownerInfo.email}</p>
+                </div>
+                <span className="text-[12px] text-[#8E8E93] flex-shrink-0">Owner</span>
+              </div>
+            )}
+
+            {/* Collaborators */}
+            {people.map((p) => (
+              <div key={p.userId} className="flex items-center gap-2.5 py-1.5">
+                <div className="w-7 h-7 rounded-full bg-[#8E8E93] text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0">
+                  {(p.displayName || p.email || '?').charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-[#1D1D1F] truncate">{p.displayName || p.email}</p>
+                  <p className="text-[11px] text-[#8E8E93] truncate">{p.email}</p>
+                </div>
+                {isOwner ? (
+                  <>
+                    <select
+                      value={p.permission}
+                      onChange={(e) => changePersonPermission(p.email, e.target.value as 'view' | 'edit')}
+                      aria-label={`Permission for ${p.email}`}
+                      className="text-[12px] rounded-[6px] border border-[rgba(0,0,0,0.12)] px-1.5 py-1 bg-white text-[#3A3A3C] flex-shrink-0"
+                    >
+                      <option value="view">Can view</option>
+                      <option value="edit">Can edit</option>
+                    </select>
+                    <button type="button" onClick={() => removePerson(p.userId)} aria-label={`Remove ${p.email}`} className="text-[#8E8E93] hover:text-[#FF3B30] flex-shrink-0 p-1">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </>
+                ) : (
+                  <span className="text-[12px] text-[#8E8E93] flex-shrink-0">{p.permission === 'edit' ? 'Can edit' : 'Can view'}</span>
+                )}
+              </div>
+            ))}
+
+            {people.length === 0 && !ownerInfo && (
+              <p className="text-[12px] text-[#8E8E93] py-1">No one else has access yet.</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1110,6 +1295,7 @@ export default function Editor({ docId }: { docId: string }) {
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const [provider, setProvider] = useState<SocketIOProvider | null>(null);
   const [isOnline, setIsOnline] = useState(true);
+  const [canEditDoc, setCanEditDoc] = useState(true);
   const [commentOpen, setCommentOpen] = useState(false);
   const [commentInput, setCommentInput] = useState('');
   const [pendingAnchorText, setPendingAnchorText] = useState('');
@@ -1139,7 +1325,17 @@ export default function Editor({ docId }: { docId: string }) {
     const p = new SocketIOProvider(ydocRef.current!, socket, docId);
     setProvider(p);
 
-    socket.emit('doc:join', { docId });
+    // Persist the document locally so it loads instantly and stays editable
+    // offline. Y.js merges local + server state automatically on reconnect.
+    const idb = new IndexeddbPersistence(`collabdocs-${docId}`, ydocRef.current!);
+
+    // Pass the share token (if the user arrived via a share link) so the server
+    // can authorize link-based access without it granting access to everyone.
+    const shareToken = new URLSearchParams(window.location.search).get('share');
+    socket.emit('doc:join', { docId, shareToken });
+    socket.on('doc:permission', ({ permission }: { permission: 'owner' | 'edit' | 'view' }) => {
+      setCanEditDoc(permission === 'owner' || permission === 'edit');
+    });
     socket.on('doc:awareness', ({ users }: any) => setOnlineUsers(users));
     socket.on('doc:saved', () => {
       setSaving(false);
@@ -1169,9 +1365,11 @@ export default function Editor({ docId }: { docId: string }) {
 
     return () => {
       p.destroy();
+      idb.destroy();
       setProvider(null);
       socket.off('connect');
       socket.off('disconnect');
+      socket.off('doc:permission');
       socket.off('doc:awareness');
       socket.off('doc:saved');
       socket.off('doc:typing');
@@ -1268,6 +1466,11 @@ export default function Editor({ docId }: { docId: string }) {
       setSaving(true);
     },
   }, [provider]);
+
+  // Reflect the server-authorized permission: viewers get a read-only editor.
+  useEffect(() => {
+    editor?.setEditable(canEditDoc);
+  }, [editor, canEditDoc]);
 
   const handleTitleBlur = useCallback(async () => {
     await api.patch(`/docs/${docId}`, { title }).catch(() => {});

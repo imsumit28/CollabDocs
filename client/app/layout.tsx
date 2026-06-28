@@ -1,8 +1,9 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ToastProvider } from '../contexts/ToastContext';
+import ServiceWorkerRegister from '../components/ServiceWorkerRegister';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -25,12 +26,22 @@ export const metadata: Metadata = {
     apple: '/favicon.png',
     shortcut: '/favicon.png',
   },
+  appleWebApp: {
+    capable: true,
+    title: 'CollabDocs',
+    statusBarStyle: 'default',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#2563EB',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={inter.variable}>
       <body className="font-sans bg-[#F5F5F7] text-[#1D1D1F] antialiased">
+        <ServiceWorkerRegister />
         <AuthProvider>
           <ToastProvider>
             {children}
