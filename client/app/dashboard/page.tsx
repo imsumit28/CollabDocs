@@ -18,10 +18,17 @@ interface Doc {
   shareLink?: string | null;
   shareLinkPermission?: 'view' | 'edit' | null;
   deletedAt?: string | null;
+  folderId?: string | null;
   content?: string;
   lastEditedBy?: string;
   lastEditedAt?: string;
   isLive?: boolean;
+}
+
+interface Folder {
+  _id: string;
+  name: string;
+  docCount: number;
 }
 
 interface Activity {
@@ -116,8 +123,91 @@ function RenameModal({ doc, onClose, onSave }: { doc: Doc; onClose: () => void; 
   );
 }
 
+// ─── Folder name Modal (create / rename) ──────────────────────────────────────
+function FolderNameModal({ title, initial = '', confirmLabel, onClose, onSave }: {
+  title: string; initial?: string; confirmLabel: string; onClose: () => void; onSave: (name: string) => void;
+}) {
+  const [name, setName] = useState(initial);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { inputRef.current?.select(); }, []);
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (name.trim()) onSave(name.trim());
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4 anim-fade-in">
+      <div className="bg-white rounded-[20px] shadow-apple-xl max-w-sm w-full p-6 anim-scale-in">
+        <h2 className="text-[17px] font-semibold text-[#1D1D1F] mb-4">{title}</h2>
+        <form onSubmit={submit}>
+          <input
+            ref={inputRef}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="input-apple mb-4"
+            placeholder="Folder name"
+          />
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} className="btn-ghost flex-1 justify-center py-2.5">Cancel</button>
+            <button type="submit" className="btn-primary flex-1 justify-center py-2.5">{confirmLabel}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Move-to-folder Modal ──────────────────────────────────────────────────────
+function MoveToFolderModal({ doc, folders, onClose, onMove }: {
+  doc: Doc; folders: Folder[]; onClose: () => void; onMove: (doc: Doc, folderId: string | null) => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4 anim-fade-in">
+      <div className="bg-white rounded-[20px] shadow-apple-xl max-w-sm w-full p-6 anim-scale-in">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[17px] font-semibold text-[#1D1D1F]">Move "{doc.title || 'Untitled'}"</h2>
+          <button type="button" aria-label="Close" onClick={onClose} className="w-7 h-7 rounded-full text-[#8E8E93] hover:bg-[#F5F5F7] flex items-center justify-center">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="space-y-1 max-h-72 overflow-y-auto">
+          <button
+            type="button"
+            onClick={() => onMove(doc, null)}
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-colors ${
+              !doc.folderId ? 'bg-[#2563EB]/10 text-[#2563EB]' : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+            No folder (root)
+          </button>
+          {folders.length === 0 && (
+            <p className="text-[13px] text-[#8E8E93] px-3 py-2">No folders yet — create one from the sidebar.</p>
+          )}
+          {folders.map((f) => (
+            <button
+              key={f._id}
+              type="button"
+              onClick={() => onMove(doc, f._id)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-colors ${
+                doc.folderId === f._id ? 'bg-[#2563EB]/10 text-[#2563EB]' : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+              <span className="flex-1 truncate">{f.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Share Modal ──────────────────────────────────────────────────────────────
-function ShareModal({ doc, onClose, toast }: { doc: Doc; onClose: () => void; toast: any }) {
+interface Person { userId: string; email: string | null; displayName: string | null; avatarUrl: string | null; permission: 'view' | 'edit'; }
+
+function ShareModal({ doc, onClose, toast, currentUserId }: { doc: Doc; onClose: () => void; toast: any; currentUserId?: string }) {
   const [shareUrl, setShareUrl] = useState<string | null>(
     doc.shareLink ? `${window.location.origin}/doc/${doc._id}?share=${doc.shareLink}` : null
   );
@@ -126,6 +216,59 @@ function ShareModal({ doc, onClose, toast }: { doc: Doc; onClose: () => void; to
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+
+  // People with access (collaborators invited by email) — mirrors the editor's
+  // Share modal so owners can manage access without opening the document.
+  const isOwner = doc.ownerId?.toString() === currentUserId?.toString();
+  const [people, setPeople] = useState<Person[]>([]);
+  const [ownerInfo, setOwnerInfo] = useState<{ userId: string; displayName: string | null; email: string | null } | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [invitePerm, setInvitePerm] = useState<'view' | 'edit'>('view');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState('');
+
+  useEffect(() => {
+    api.get(`/docs/${doc._id}/collaborators`)
+      .then((res) => {
+        setPeople(res.data.collaborators || []);
+        setOwnerInfo(res.data.owner || null);
+      })
+      .catch(() => { /* non-fatal — link sharing still works */ });
+  }, [doc._id]);
+
+  const invite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail.trim()) return;
+    setInviteLoading(true); setInviteError('');
+    try {
+      const res = await api.post(`/docs/${doc._id}/collaborators`, { email: inviteEmail.trim(), permission: invitePerm });
+      setPeople(res.data.collaborators || []);
+      setInviteEmail('');
+      toast.success('Invitation added');
+    } catch (err: any) {
+      setInviteError(err.response?.data?.error || 'Could not add that person');
+    } finally { setInviteLoading(false); }
+  };
+
+  const changePersonPermission = async (email: string | null, perm: 'view' | 'edit') => {
+    if (!email) return;
+    try {
+      const res = await api.post(`/docs/${doc._id}/collaborators`, { email, permission: perm });
+      setPeople(res.data.collaborators || []);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Could not update permission');
+    }
+  };
+
+  const removePerson = async (userId: string) => {
+    try {
+      const res = await api.delete(`/docs/${doc._id}/collaborators/${userId}`);
+      setPeople(res.data.collaborators || []);
+      toast.success('Removed');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Could not remove person');
+    }
+  };
 
   const apply = async (newEnabled: boolean, newPerm: 'view' | 'edit') => {
     setLoading(true); setError('');
@@ -195,6 +338,88 @@ function ShareModal({ doc, onClose, toast }: { doc: Doc; onClose: () => void; to
           </div>
         )}
         {!enabled && <p className="text-[13px] text-[#8E8E93] text-center mt-2">Enable sharing to generate a link</p>}
+
+        {/* People with access */}
+        <div className="mt-6 pt-5 border-t border-[rgba(0,0,0,0.08)]">
+          <p className="text-[14px] font-semibold text-[#1D1D1F] mb-3">People with access</p>
+
+          {isOwner && (
+            <form onSubmit={invite} className="mb-3">
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => { setInviteEmail(e.target.value); setInviteError(''); }}
+                  placeholder="Invite by email"
+                  aria-label="Invite by email"
+                  className="input-apple text-[13px] flex-1"
+                />
+                <select
+                  value={invitePerm}
+                  onChange={(e) => setInvitePerm(e.target.value as 'view' | 'edit')}
+                  aria-label="Invite permission"
+                  className="text-[13px] rounded-[8px] border border-[rgba(0,0,0,0.12)] px-2 bg-white text-[#3A3A3C]"
+                >
+                  <option value="view">Can view</option>
+                  <option value="edit">Can edit</option>
+                </select>
+                <button type="submit" disabled={inviteLoading || !inviteEmail.trim()} className="btn-primary px-4 text-[13px] disabled:opacity-50">
+                  {inviteLoading ? '…' : 'Invite'}
+                </button>
+              </div>
+              {inviteError && <p className="text-[12px] text-[#FF3B30] mt-1.5 font-medium">{inviteError}</p>}
+            </form>
+          )}
+
+          <div className="space-y-1.5 max-h-[180px] overflow-y-auto">
+            {ownerInfo && (
+              <div className="flex items-center gap-2.5 py-1.5">
+                <div className="w-7 h-7 rounded-full bg-[#007AFF] text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0">
+                  {(ownerInfo.displayName || ownerInfo.email || '?').charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-[#1D1D1F] truncate">{ownerInfo.displayName || ownerInfo.email}</p>
+                  <p className="text-[11px] text-[#8E8E93] truncate">{ownerInfo.email}</p>
+                </div>
+                <span className="text-[12px] text-[#8E8E93] flex-shrink-0">Owner</span>
+              </div>
+            )}
+
+            {people.map((p) => (
+              <div key={p.userId} className="flex items-center gap-2.5 py-1.5">
+                <div className="w-7 h-7 rounded-full bg-[#8E8E93] text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0">
+                  {(p.displayName || p.email || '?').charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-[#1D1D1F] truncate">{p.displayName || p.email}</p>
+                  <p className="text-[11px] text-[#8E8E93] truncate">{p.email}</p>
+                </div>
+                {isOwner ? (
+                  <>
+                    <select
+                      value={p.permission}
+                      onChange={(e) => changePersonPermission(p.email, e.target.value as 'view' | 'edit')}
+                      aria-label={`Permission for ${p.email}`}
+                      className="text-[12px] rounded-[6px] border border-[rgba(0,0,0,0.12)] px-1.5 py-1 bg-white text-[#3A3A3C] flex-shrink-0"
+                    >
+                      <option value="view">Can view</option>
+                      <option value="edit">Can edit</option>
+                    </select>
+                    <button type="button" onClick={() => removePerson(p.userId)} aria-label={`Remove ${p.email}`} className="text-[#8E8E93] hover:text-[#FF3B30] flex-shrink-0 p-1">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </>
+                ) : (
+                  <span className="text-[12px] text-[#8E8E93] flex-shrink-0">{p.permission === 'edit' ? 'Can edit' : 'Can view'}</span>
+                )}
+              </div>
+            ))}
+
+            {people.length === 0 && !ownerInfo && (
+              <p className="text-[12px] text-[#8E8E93] py-1">No one else has access yet.</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -235,14 +460,14 @@ function ContextMenu({
   anchor,
   isOwner, isFavorite,
   onRename, onFavorite, onShare, onCopyLink,
-  onDuplicate, onVersionHistory, onExport, onInfo, onDelete,
+  onDuplicate, onVersionHistory, onExport, onInfo, onDelete, onMove,
   onClose,
 }: {
   anchor: DOMRect;
   isOwner: boolean; isFavorite: boolean;
   onRename: () => void; onFavorite: () => void; onShare: () => void; onCopyLink: () => void;
   onDuplicate: () => void; onVersionHistory: () => void; onExport: (fmt: 'pdf' | 'docx') => void;
-  onInfo: () => void; onDelete: () => void; onClose: () => void;
+  onInfo: () => void; onDelete: () => void; onMove?: () => void; onClose: () => void;
 }) {
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const desktopMenuRef = useRef<HTMLDivElement>(null);
@@ -315,6 +540,10 @@ function ContextMenu({
       {/* Group 3 */}
       <Item icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>}
         label="Duplicate" onClick={() => { onDuplicate(); onClose(); }} />
+      {onMove && isOwner && (
+        <Item icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>}
+          label="Move to folder" onClick={() => { onMove(); onClose(); }} />
+      )}
       <Item icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
         label="Version History" onClick={() => { onVersionHistory(); onClose(); }} />
 
@@ -494,7 +723,7 @@ function HighlightedTitle({ text, highlight }: { text: string; highlight: string
 function DocCard({
   doc, userId, isFavorite, isPinned, searchQuery = '',
   onDelete, onFavoriteToggle, onPinToggle, onRename, onDuplicate, onShareOpen, onInfoOpen,
-  onRestore, onPermanentDelete,
+  onRestore, onPermanentDelete, onMoveToFolder,
 }: {
   doc: Doc; userId: string; isFavorite: boolean; isPinned: boolean; searchQuery?: string;
   onDelete: (id: string) => void;
@@ -506,6 +735,7 @@ function DocCard({
   onInfoOpen: (doc: Doc) => void;
   onRestore?: (id: string) => void;
   onPermanentDelete?: (id: string) => void;
+  onMoveToFolder?: (doc: Doc) => void;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -659,6 +889,7 @@ function DocCard({
                   onExport={exportDoc}
                   onInfo={() => onInfoOpen(doc)}
                   onDelete={() => onDelete(doc._id)}
+                  onMove={onMoveToFolder ? () => onMoveToFolder(doc) : undefined}
                   onClose={() => setMenuOpen(false)}
                 />
               )}
@@ -1295,6 +1526,105 @@ function TemplateRow({ onCreate }: { onCreate: (title: string, template?: string
   );
 }
 
+// ─── Notification Bell ──────────────────────────────────────────────────────────
+interface Notif {
+  _id: string;
+  type: 'mention' | 'comment' | 'share';
+  actorName: string;
+  documentId: string;
+  documentTitle: string;
+  snippet: string;
+  read: boolean;
+  createdAt: string;
+}
+
+function NotificationBell() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const { data, mutate } = useSWR<{ notifications: Notif[]; unread: number }>(
+    '/notifications', fetcher, { refreshInterval: 30000, revalidateOnFocus: true }
+  );
+  const notifications = data?.notifications ?? [];
+  const unread = data?.unread ?? 0;
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+
+  const openNotif = async (n: Notif) => {
+    setOpen(false);
+    if (!n.read) { await api.patch(`/notifications/${n._id}/read`).catch(() => {}); mutate(); }
+    router.push(`/doc/${n.documentId}`);
+  };
+
+  const markAll = async () => {
+    await api.post('/notifications/read-all').catch(() => {});
+    mutate();
+  };
+
+  const verb = (t: Notif['type']) => t === 'mention' ? 'mentioned you in' : t === 'share' ? 'shared' : 'commented on';
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-label={`Notifications${unread ? ` (${unread} unread)` : ''}`}
+        onClick={() => setOpen((v) => !v)}
+        className="relative p-2 rounded-lg text-[#6E6E73] hover:bg-[#F4F4F5] transition-colors"
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+        {unread > 0 && (
+          <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#FF3B30] text-white text-[10px] font-bold flex items-center justify-center">
+            {unread > 9 ? '9+' : unread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-[340px] max-w-[90vw] bg-white rounded-[14px] shadow-apple-lg border border-[rgba(0,0,0,0.08)] z-50 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(0,0,0,0.06)]">
+            <span className="text-[14px] font-semibold text-[#1D1D1F]">Notifications</span>
+            {unread > 0 && (
+              <button type="button" onClick={markAll} className="text-[12px] font-medium text-[#2563EB] hover:underline">
+                Mark all read
+              </button>
+            )}
+          </div>
+          <div className="max-h-[360px] overflow-y-auto">
+            {notifications.length === 0 ? (
+              <p className="text-[13px] text-[#8E8E93] text-center py-8">You're all caught up.</p>
+            ) : (
+              notifications.map((n) => (
+                <button
+                  key={n._id}
+                  type="button"
+                  onClick={() => openNotif(n)}
+                  className={`w-full text-left px-4 py-3 border-b border-[rgba(0,0,0,0.04)] hover:bg-[#F5F5F7] transition-colors ${n.read ? '' : 'bg-[#2563EB]/[0.04]'}`}
+                >
+                  <p className="text-[13px] text-[#1D1D1F] leading-snug">
+                    <span className="font-semibold">{n.actorName || 'Someone'}</span>{' '}
+                    {verb(n.type)}{' '}
+                    <span className="font-medium">{n.documentTitle || 'Untitled'}</span>
+                  </p>
+                  {n.snippet && <p className="text-[12px] text-[#8E8E93] mt-0.5 line-clamp-2">{n.snippet}</p>}
+                  <p className="text-[11px] text-[#AEAEB2] mt-1">{timeAgo(n.createdAt)}</p>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { user, logout, loading } = useAuth();
@@ -1313,6 +1643,16 @@ export default function DashboardPage() {
   const [newDocModal, setNewDocModal] = useState(false);
   const [sortBy, setSortBy] = useState<'lastEdited' | 'created' | 'title'>('lastEdited');
   const [filterBy, setFilterBy] = useState<'all' | 'shared' | 'private'>('all');
+  // How many (unpinned) documents to render at once. Pinned docs always show;
+  // the rest load in pages so a large library doesn't render hundreds of cards.
+  const PAGE_SIZE = 24;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  // Folders (owner-only organization). activeFolderId narrows the main view to
+  // one folder; null means "all folders / no folder filter".
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
+  const [moveDoc, setMoveDoc] = useState<Doc | null>(null);
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+  const [renameFolder, setRenameFolder] = useState<Folder | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting' | 'offline'>('connected');
   const [lastSyncTime, setLastSyncTime] = useState(new Date());
   const { favorites, toggle: toggleFavorite } = useFavorites();
@@ -1450,6 +1790,21 @@ export default function DashboardPage() {
   // Use real documents from API, empty array if none loaded yet
   const displayDocs = Array.isArray(docs) ? docs : [];
 
+  // Folders for the sidebar (owner's organization).
+  const { data: folders, mutate: mutateFolders } = useSWR<Folder[]>(user ? '/folders' : null, fetcher);
+  const folderList = Array.isArray(folders) ? folders : [];
+  const activeFolder = folderList.find((f) => f._id === activeFolderId) || null;
+
+  // Server-side search (title + content). Active only when there's a query and
+  // we're not viewing trash. Falls back to the full list otherwise.
+  const trimmedSearch = debouncedSearch.trim();
+  const searching = !!trimmedSearch && !isTrashMode;
+  const { data: searchResults } = useSWR<Doc[]>(
+    searching && user ? `/docs/search?q=${encodeURIComponent(trimmedSearch)}` : null,
+    fetcher,
+  );
+  const baseDocs = searching ? (searchResults ?? []) : displayDocs;
+
   // Simulate connection status changes
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1549,9 +1904,59 @@ export default function DashboardPage() {
     } catch { toast.error('Failed to duplicate document'); }
   }, [mutate, router, toast]);
 
+  // Switching to a top-level tab exits any active folder view.
+  const selectFilterMode = useCallback((m: 'all' | 'shared' | 'starred' | 'trash') => {
+    setFilterMode(m);
+    setActiveFolderId(null);
+  }, []);
+
+  // ─── Folder actions ──────────────────────────────────────────────────────────
+  const createFolder = useCallback(async (name: string) => {
+    try {
+      await api.post('/folders', { name });
+      mutateFolders();
+      setNewFolderOpen(false);
+      toast.success('Folder created');
+    } catch (e: any) { toast.error(e?.response?.data?.error || 'Failed to create folder'); }
+  }, [mutateFolders, toast]);
+
+  const renameFolderFn = useCallback(async (folder: Folder, name: string) => {
+    try {
+      await api.patch(`/folders/${folder._id}`, { name });
+      mutateFolders();
+      setRenameFolder(null);
+      toast.success('Folder renamed');
+    } catch (e: any) { toast.error(e?.response?.data?.error || 'Failed to rename folder'); }
+  }, [mutateFolders, toast]);
+
+  const deleteFolder = useCallback(async (folder: Folder) => {
+    try {
+      await api.delete(`/folders/${folder._id}`);
+      if (activeFolderId === folder._id) setActiveFolderId(null);
+      mutateFolders();
+      mutate();
+      toast.success('Folder deleted — its documents moved to root');
+    } catch { toast.error('Failed to delete folder'); }
+  }, [activeFolderId, mutateFolders, mutate, toast]);
+
+  const moveToFolder = useCallback(async (doc: Doc, folderId: string | null) => {
+    try {
+      await api.patch(`/docs/${doc._id}`, { folderId });
+      mutate();
+      mutateFolders();
+      setMoveDoc(null);
+      toast.success(folderId ? 'Moved to folder' : 'Removed from folder');
+    } catch (e: any) { toast.error(e?.response?.data?.error || 'Failed to move document'); }
+  }, [mutate, mutateFolders, toast]);
+
   // Enhanced filtering and sorting
-  const filtered = (displayDocs ?? [])
-    .filter((d) => (d.title || 'Untitled').toLowerCase().includes(debouncedSearch.toLowerCase()))
+  const filtered = (baseDocs ?? [])
+    // Folder scope (owner-only organization). When a folder is selected, show
+    // only that folder's documents; otherwise show everything.
+    .filter((d) => !activeFolderId || d.folderId === activeFolderId)
+    // When searching, the server already matched title + content, so don't
+    // re-apply a client-side title-only filter (it would drop content matches).
+    .filter((d) => searching || (d.title || 'Untitled').toLowerCase().includes(debouncedSearch.toLowerCase()))
     .filter((d) => {
       const isOwner = d.ownerId?.toString() === user?.id;
       if (filterMode === 'shared') return !isOwner;
@@ -1575,14 +1980,23 @@ export default function DashboardPage() {
     });
 
   const pinnedDocs = filterMode === 'trash' ? [] : filtered.filter((d) => pinned.has(d._id));
-  const unpinnedDocs = filterMode === 'trash' 
-    ? filtered 
+  const unpinnedDocsAll = filterMode === 'trash'
+    ? filtered
     : filtered.filter((d) => !pinned.has(d._id)).sort((a, b) => {
         const af = favorites.has(a._id) ? 0 : 1;
         const bf = favorites.has(b._id) ? 0 : 1;
         return af - bf;
       });
-  const allFiltered = [...pinnedDocs, ...unpinnedDocs];
+  // Only render up to visibleCount of the unpinned docs; "Load more" reveals more.
+  const unpinnedDocs = unpinnedDocsAll.slice(0, visibleCount);
+  const hasMoreDocs = unpinnedDocsAll.length > unpinnedDocs.length;
+  const allFiltered = [...pinnedDocs, ...unpinnedDocsAll];
+
+  // Whenever the active view changes, collapse back to the first page so we
+  // don't carry a huge visibleCount across tabs/searches.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filterMode, debouncedSearch, sortBy, filterBy, activeFolderId]);
 
   if (loading || !user) {
     return (
@@ -1599,6 +2013,7 @@ export default function DashboardPage() {
   if (filterMode === 'shared') pageTitle = 'Shared with me';
   if (filterMode === 'starred') pageTitle = 'Starred';
   if (filterMode === 'trash') pageTitle = 'Trash';
+  if (activeFolder) pageTitle = activeFolder.name;
 
   return (
     <div className="min-h-screen bg-[#F5F5F7]">
@@ -1661,6 +2076,8 @@ export default function DashboardPage() {
               </button>
             </div>
 
+            {user && <NotificationBell />}
+
             {user?.displayName && (
               <div ref={profileMenuRef} className="block relative">
                 <button
@@ -1688,14 +2105,7 @@ export default function DashboardPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => { setProfileMenuOpen(false); toast.info('Profile page can be added here.'); }}
-                        className="w-full text-left px-3 py-2 text-sm text-[#1D1D1F] hover:bg-[#F4F4F5] rounded-lg transition-colors"
-                      >
-                        My Profile
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setProfileMenuOpen(false); toast.info('Account settings can be added here.'); }}
+                        onClick={() => { setProfileMenuOpen(false); router.push('/settings'); }}
                         className="w-full text-left px-3 py-2 text-sm text-[#1D1D1F] hover:bg-[#F4F4F5] rounded-lg transition-colors"
                       >
                         Account Settings
@@ -1725,30 +2135,80 @@ export default function DashboardPage() {
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider mb-3">Navigation</h3>
             <div className="space-y-1">
-              <SidebarItem 
-                active={filterMode === 'all'} 
-                onClick={() => setFilterMode('all')}
-                label="My Documents" 
-                icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} 
+              <SidebarItem
+                active={filterMode === 'all' && !activeFolderId}
+                onClick={() => selectFilterMode('all')}
+                label="My Documents"
+                icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
               />
-              <SidebarItem 
-                active={filterMode === 'shared'} 
-                onClick={() => setFilterMode('shared')}
-                label="Shared with me" 
-                icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>} 
+              <SidebarItem
+                active={filterMode === 'shared' && !activeFolderId}
+                onClick={() => selectFilterMode('shared')}
+                label="Shared with me"
+                icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>}
               />
-              <SidebarItem 
-                active={filterMode === 'starred'} 
-                onClick={() => setFilterMode('starred')}
-                label="Starred" 
-                icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>} 
+              <SidebarItem
+                active={filterMode === 'starred' && !activeFolderId}
+                onClick={() => selectFilterMode('starred')}
+                label="Starred"
+                icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>}
               />
-              <SidebarItem 
-                active={filterMode === 'trash'} 
-                onClick={() => setFilterMode('trash')}
-                label="Trash" 
-                icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>} 
+              <SidebarItem
+                active={filterMode === 'trash' && !activeFolderId}
+                onClick={() => selectFilterMode('trash')}
+                label="Trash"
+                icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>}
               />
+            </div>
+          </div>
+
+          {/* Folders */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider">Folders</h3>
+              <button
+                type="button"
+                onClick={() => setNewFolderOpen(true)}
+                className="text-[#2563EB] hover:text-[#1D4ED8] transition-colors p-0.5 rounded"
+                title="New folder"
+                aria-label="New folder"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              </button>
+            </div>
+            <div className="space-y-1">
+              {folderList.length === 0 && (
+                <p className="text-[13px] text-[#8E8E93] px-3 py-1">No folders yet</p>
+              )}
+              {folderList.map((folder) => (
+                <div
+                  key={folder._id}
+                  className={`group flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                    activeFolderId === folder._id ? 'bg-[#2563EB]/10 text-[#2563EB]' : 'text-[#6E6E73] hover:bg-[#F5F5F7] hover:text-[#1D1D1F]'
+                  }`}
+                  onClick={() => { setFilterMode('all'); setActiveFolderId(folder._id); }}
+                >
+                  <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                  <span className="flex-1 truncate">{folder.name}</span>
+                  <span className="text-[11px] text-[#AEAEB2]">{folder.docCount}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setRenameFolder(folder); }}
+                    className="opacity-0 group-hover:opacity-100 text-[#8E8E93] hover:text-[#2563EB] transition-all p-0.5"
+                    title="Rename folder" aria-label="Rename folder"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); deleteFolder(folder); }}
+                    className="opacity-0 group-hover:opacity-100 text-[#8E8E93] hover:text-[#FF3B30] transition-all p-0.5"
+                    title="Delete folder" aria-label="Delete folder"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -2011,6 +2471,7 @@ export default function DashboardPage() {
                         onInfoOpen={(d) => setInfoDoc(d)}
                         onRestore={restoreDoc}
                         onPermanentDelete={(id) => setDeleteModal(id)}
+                        onMoveToFolder={(d) => setMoveDoc(d)}
                       />
                     </div>
                   ))}
@@ -2044,10 +2505,22 @@ export default function DashboardPage() {
                         onInfoOpen={(d) => setInfoDoc(d)}
                         onRestore={restoreDoc}
                         onPermanentDelete={(id) => setDeleteModal(id)}
+                        onMoveToFolder={(d) => setMoveDoc(d)}
                       />
                     </div>
                   ))}
                 </div>
+                {hasMoreDocs && (
+                  <div className="flex justify-center mt-6">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                      className="btn-ghost px-5 py-2.5 text-sm font-medium"
+                    >
+                      Load more ({unpinnedDocsAll.length - unpinnedDocs.length} remaining)
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2068,7 +2541,7 @@ export default function DashboardPage() {
       )}
 
       {/* Mobile bottom navigation */}
-      <MobileBottomNav filterMode={filterMode} setFilterMode={setFilterMode} />
+      <MobileBottomNav filterMode={activeFolderId ? '' : filterMode} setFilterMode={selectFilterMode} />
 
       {/* Delete modal */}
       {deleteModal && (
@@ -2102,12 +2575,33 @@ export default function DashboardPage() {
 
       {/* Share modal */}
       {shareDoc && (
-        <ShareModal doc={shareDoc} onClose={() => setShareDoc(null)} toast={toast} />
+        <ShareModal doc={shareDoc} onClose={() => setShareDoc(null)} toast={toast} currentUserId={user?.id} />
       )}
 
       {/* Doc info modal */}
       {infoDoc && (
         <DocInfoModal doc={infoDoc} isOwner={infoDoc.ownerId?.toString() === user?.id?.toString()} onClose={() => setInfoDoc(null)} />
+      )}
+
+      {/* New folder modal */}
+      {newFolderOpen && (
+        <FolderNameModal title="New Folder" confirmLabel="Create" onClose={() => setNewFolderOpen(false)} onSave={createFolder} />
+      )}
+
+      {/* Rename folder modal */}
+      {renameFolder && (
+        <FolderNameModal
+          title="Rename Folder"
+          initial={renameFolder.name}
+          confirmLabel="Rename"
+          onClose={() => setRenameFolder(null)}
+          onSave={(name) => renameFolderFn(renameFolder, name)}
+        />
+      )}
+
+      {/* Move to folder modal */}
+      {moveDoc && (
+        <MoveToFolderModal doc={moveDoc} folders={folderList} onClose={() => setMoveDoc(null)} onMove={moveToFolder} />
       )}
     </div>
   );

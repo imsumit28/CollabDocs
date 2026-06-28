@@ -18,6 +18,8 @@ interface AuthContextType {
   signup: (email: string, password: string, displayName: string, username?: string) => Promise<void>;
   logout: () => Promise<void>;
   completeOAuthLogin: (accessToken?: string) => Promise<boolean>;
+  refreshUser: () => Promise<void>;
+  applyAccessToken: (accessToken: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -86,8 +88,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const meRes = await api.get('/auth/me');
+      setUser(meRes.data);
+    } catch { /* keep existing user on failure */ }
+  }, []);
+
+  const applyAccessToken = useCallback((accessToken: string) => {
+    setToken(accessToken);
+    sessionStorage.setItem('accessToken', accessToken);
+    api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, signup, logout, completeOAuthLogin }}>
+    <AuthContext.Provider value={{ user, token, loading, login, signup, logout, completeOAuthLogin, refreshUser, applyAccessToken }}>
       {children}
     </AuthContext.Provider>
   );
