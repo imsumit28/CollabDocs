@@ -14,16 +14,22 @@ import {
   setRefreshCookie,
   clearRefreshCookie,
 } from '../utils/jwt';
-import { signupRateLimit, authRateLimit, resendVerificationRateLimit } from '../middleware/rateLimit';
+import { signupRateLimit, authRateLimit, resendVerificationRateLimit, forgotPasswordRateLimit } from '../middleware/rateLimit';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { sendVerificationEmail } from '../utils/mailer';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/mailer';
+import { validateEmail, validatePassword, validateDisplayName, validateAvatarUrl, firstError } from '../utils/validation';
 
 const envCandidates = [
   path.resolve(process.cwd(), '.env'),
   path.resolve(process.cwd(), 'server', '.env'),
 ];
 const envPath = envCandidates.find((candidate) => fs.existsSync(candidate));
-dotenv.config(envPath ? { path: envPath, override: true } : { override: true });
+// Don't load the production .env during Jest — the test harness controls the
+// environment (NODE_ENV=test, secrets, etc.). Loading it here with override:true
+// would clobber those values (e.g. flipping NODE_ENV back to development).
+if (!process.env.JEST_WORKER_ID) {
+  dotenv.config(envPath ? { path: envPath, override: true } : { override: true });
+}
 
 const router = Router();
 
@@ -84,12 +90,13 @@ passport.use(
 router.post('/signup', signupRateLimit, async (req: Request, res: Response) => {
   try {
     const { email, password, displayName, username } = req.body;
-    if (!email || !password || !displayName) {
-      res.status(400).json({ error: 'email, password, and displayName are required' });
-      return;
-    }
-    if (password.length < 8) {
-      res.status(400).json({ error: 'Password must be at least 8 characters' });
+    const validationError = firstError(
+      validateEmail(email),
+      validatePassword(password),
+      validateDisplayName(displayName),
+    );
+    if (validationError) {
+      res.status(400).json({ error: validationError.message, field: validationError.field });
       return;
     }
 
@@ -149,6 +156,18 @@ router.post('/login', authRateLimit, async (req: Request, res: Response) => {
     const match = await bcrypt.compare(password, user.passwordHash);
     if (!match) {
       res.status(401).json({ error: 'Invalid credentials' });
+      return;
+    }
+
+    // Optional enforcement: when REQUIRE_EMAIL_VERIFICATION=true, block login for
+    // unverified password accounts. Off by default so local/dev (where SMTP may
+    // be unconfigured) and existing users aren't locked out. OAuth users are
+    // always verified, so they're unaffected.
+    if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && !user.emailVerified) {
+      res.status(403).json({
+        error: 'Please verify your email address before logging in.',
+        code: 'EMAIL_NOT_VERIFIED',
+      });
       return;
     }
 
@@ -223,7 +242,84 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
     username: user.username ?? null,
     avatarUrl: user.avatarUrl ?? null,
     emailVerified: user.emailVerified,
+    hasPassword: !!user.passwordHash,
   });
+});
+
+// ─── Update profile ─────────────────────────────────────────────────────────
+router.patch('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user?.sub);
+    if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+
+    const { displayName, username, avatarUrl } = req.body;
+
+    if (displayName !== undefined) {
+      const err = validateDisplayName(displayName);
+      if (err) { res.status(400).json({ error: err.message, field: err.field }); return; }
+      user.displayName = displayName.trim();
+    }
+    if (username !== undefined) {
+      user.username = normalizeUsername(username);
+    }
+    if (avatarUrl !== undefined) {
+      const err = validateAvatarUrl(avatarUrl);
+      if (err) { res.status(400).json({ error: err.message, field: err.field }); return; }
+      user.avatarUrl = avatarUrl ? avatarUrl.trim() : null;
+    }
+
+    await user.save();
+    res.json({
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      username: user.username ?? null,
+      avatarUrl: user.avatarUrl ?? null,
+      emailVerified: user.emailVerified,
+    });
+  } catch {
+    res.status(500).json({ error: 'Could not update profile' });
+  }
+});
+
+// ─── Change password ──────────────────────────────────────────────────────────
+router.post('/change-password', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user?.sub);
+    if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+    if (!user.passwordHash) {
+      res.status(400).json({ error: 'Your account uses Google sign-in, so there is no password to change.' });
+      return;
+    }
+    if (!currentPassword) {
+      res.status(400).json({ error: 'Current password is required' });
+      return;
+    }
+
+    const match = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!match) {
+      res.status(401).json({ error: 'Current password is incorrect' });
+      return;
+    }
+
+    const err = validatePassword(newPassword);
+    if (err) { res.status(400).json({ error: err.message, field: 'newPassword' }); return; }
+
+    user.passwordHash = await bcrypt.hash(newPassword, 12);
+    // Invalidate sessions on other devices, then re-issue this session's tokens
+    // so the user stays logged in where they made the change.
+    user.tokenVersion += 1;
+    await user.save();
+
+    const accessToken = signAccessToken({ sub: user.id, email: user.email, displayName: user.displayName, username: user.username });
+    const refreshToken = signRefreshToken({ sub: user.id, tokenVersion: user.tokenVersion });
+    setRefreshCookie(res, refreshToken);
+
+    res.json({ accessToken, message: 'Password updated' });
+  } catch {
+    res.status(500).json({ error: 'Could not change password' });
+  }
 });
 
 // ─── Email Verification ───────────────────────────────────────────────────────
@@ -271,6 +367,76 @@ router.post('/resend-verification', resendVerificationRateLimit, authMiddleware,
     res.json({ message: 'If your email is unverified, a new link has been sent.' });
   } catch {
     res.status(500).json({ error: 'Could not resend verification email' });
+  }
+});
+
+// ─── Password Reset ─────────────────────────────────────────────────────────
+router.post('/forgot-password', forgotPasswordRateLimit, async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    // Always respond the same way, whether or not the account exists, to avoid
+    // leaking which emails are registered.
+    const genericResponse = { message: 'If an account exists for that email, a reset link has been sent.' };
+
+    if (!email || typeof email !== 'string') {
+      res.json(genericResponse);
+      return;
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    // Only password accounts can reset — OAuth-only users have no password.
+    if (!user || !user.passwordHash) {
+      res.json(genericResponse);
+      return;
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    user.passwordResetToken = hashedToken;
+    user.passwordResetExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await user.save();
+
+    sendPasswordResetEmail(user.email, rawToken).catch(() => {});
+    res.json(genericResponse);
+  } catch {
+    res.status(500).json({ error: 'Could not process password reset request' });
+  }
+});
+
+router.post('/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || typeof token !== 'string') {
+      res.status(400).json({ error: 'Reset token is required' });
+      return;
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      res.status(400).json({ error: passwordError.message, field: 'password' });
+      return;
+    }
+
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpiry: { $gt: new Date() },
+    });
+    if (!user) {
+      res.status(400).json({ error: 'Invalid or expired reset token' });
+      return;
+    }
+
+    user.passwordHash = await bcrypt.hash(password, 12);
+    user.passwordResetToken = null;
+    user.passwordResetExpiry = null;
+    // Invalidate all existing sessions — a reset should log out other devices.
+    user.tokenVersion += 1;
+    await user.save();
+
+    res.json({ message: 'Password has been reset. You can now log in with your new password.' });
+  } catch {
+    res.status(500).json({ error: 'Could not reset password' });
   }
 });
 

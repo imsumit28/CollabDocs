@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { Version, CollabDocument } from '../models';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { getDocRoom } from '../socket/index';
+import { plainTextFromState } from '../utils/yjsText';
 
 const router = Router();
 router.use(authMiddleware);
@@ -68,6 +69,7 @@ router.post('/:id/restore', async (req: AuthRequest, res: Response) => {
   if (!isOwnerOrEditor) { res.status(403).json({ error: 'Edit permission required' }); return; }
 
   doc.yjsState = version.yjsSnapshot;
+  doc.contentText = plainTextFromState(version.yjsSnapshot);
   await doc.save();
 
   // Broadcast reset to all clients in the room

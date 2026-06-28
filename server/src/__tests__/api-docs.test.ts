@@ -5,25 +5,18 @@
  * and that Swagger/OpenAPI spec is accurate.
  */
 
-import request from 'supertest';
-import express from 'express';
+import { swaggerSpec } from '../swagger';
 
 describe('API Documentation', () => {
-  let app: express.Express;
-
-  beforeAll(() => {
-    app = express();
-  });
-
-  it('should expose Swagger API docs at /api/docs', () => {
-    // In production, Swagger UI is served at /api/docs
-    // This test verifies the endpoint exists and returns HTML
-    expect(true).toBe(true); // Verified in server/src/index.ts setup
+  it('should produce a valid OpenAPI 3.x spec object', () => {
+    const spec = swaggerSpec as { openapi?: string; info?: { title?: string } };
+    expect(spec.openapi).toMatch(/^3\./);
+    expect(spec.info?.title).toBeTruthy();
   });
 
   it('should have OpenAPI 3.0 spec accessible', () => {
-    // JSON spec should be at /api/docs/swagger.json
-    expect(true).toBe(true); // Verified in server/src/index.ts setup
+    // JSON spec is served at /api/swagger/swagger.json (see server/src/index.ts)
+    expect(swaggerSpec).toBeDefined();
   });
 
   it('API spec should document all auth endpoints', () => {

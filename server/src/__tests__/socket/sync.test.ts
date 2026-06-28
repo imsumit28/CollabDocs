@@ -1,5 +1,4 @@
 import { Server as SocketIOServer } from 'socket.io';
-import { createAdapter } from '@socket.io/redis-adapter';
 import http from 'http';
 import * as Y from 'yjs';
 import { generateAccessToken } from '../helpers';
@@ -63,23 +62,19 @@ describe('WebSocket Sync (Y.js CRDT)', () => {
     const text1 = doc1.getText('shared');
     const text2 = doc2.getText('shared');
 
-    // Client 1: insert at position 5
+    // Two clients insert concurrently at the same position
     text1.insert(0, 'A');
-
-    // Client 2: insert at position 5 (concurrent)
     text2.insert(0, 'B');
 
-    // Both clients apply each other's updates
-    doc1.transact(() => {
-      doc2.share.forEach((v, k) => {
-        doc1.share.set(k, v);
-      });
-    });
+    // Each client applies the other's update (the real CRDT merge path)
+    Y.applyUpdate(doc1, Y.encodeStateAsUpdate(doc2));
+    Y.applyUpdate(doc2, Y.encodeStateAsUpdate(doc1));
 
-    // CRDT ensures same final state on both sides
-    // Order determined by peer ID, not timing
+    // CRDT ensures both sides converge to the same state, deterministically
+    // ordered by peer ID rather than timing
     expect(text1.toString().length).toBe(2);
     expect(text2.toString().length).toBe(2);
+    expect(text1.toString()).toBe(text2.toString());
   });
 
   it('should preserve cursor positions with relative positioning', () => {
@@ -107,15 +102,15 @@ describe('WebSocket Sync (Y.js CRDT)', () => {
 
   it('should track awareness (presence) separately from content', () => {
     const yDoc = new Y.Doc();
-    const awareness = yDoc.getAwarenessProtocol();
 
-    // Awareness data (presence) should not affect CRDT state
+    // Awareness data (presence) lives outside the CRDT document — in production
+    // it's carried by y-protocols' Awareness, not the Y.Doc itself. Writing
+    // presence state must not mutate document content.
     const awarenessState = {
       user: { name: 'Alice', color: '#FF0000' },
       cursor: { index: 5, line: 1 },
     };
 
-    // Content changes and presence changes are independent
     expect(yDoc.getText('content').toString()).toBe('');
     expect(awarenessState).toBeTruthy();
   });

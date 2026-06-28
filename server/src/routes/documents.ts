@@ -1,8 +1,28 @@
 import { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { CollabDocument } from '../models';
+import { CollabDocument, User, Folder, IDocument } from '../models';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { validateTitle, validateEmail, validateShareLinkPermission, isValidObjectId } from '../utils/validation';
+import { notifyShare } from '../utils/notifications';
+import { logger } from '../utils/logger';
 import { Types } from 'mongoose';
+
+// Merge collaborator subdocs with their user details for client display.
+async function buildCollaboratorList(doc: IDocument) {
+  const ids = doc.collaborators.map((c) => c.userId);
+  const users = await User.find({ _id: { $in: ids } }, 'email displayName avatarUrl').lean();
+  const byId = new Map(users.map((u) => [u._id.toString(), u]));
+  return doc.collaborators.map((c) => {
+    const u = byId.get(c.userId.toString());
+    return {
+      userId: c.userId.toString(),
+      email: u?.email ?? null,
+      displayName: u?.displayName ?? null,
+      avatarUrl: u?.avatarUrl ?? null,
+      permission: c.permission,
+    };
+  });
+}
 
 const router = Router();
 router.use(authMiddleware);
@@ -26,32 +46,84 @@ function startTrashPurge() {
         deletedAt: { $ne: null, $lte: cutoff },
       });
       if (result.deletedCount > 0) {
-        console.log(`🗑️  Purged ${result.deletedCount} expired trash document(s)`);
+        logger.info({ count: result.deletedCount }, 'Purged expired trash documents');
       }
     } catch (err) {
-      console.error('Trash purge error:', err);
+      logger.error({ err }, 'Trash purge error');
     }
   };
   purge(); // run immediately on startup
-  setInterval(purge, 60 * 60 * 1000); // then every hour
+  // .unref() so the interval never keeps the process alive on its own
+  setInterval(purge, 60 * 60 * 1000).unref(); // then every hour
 }
-startTrashPurge();
+// Don't run the background purge under Jest — it would hit the DB on import and
+// leak a timer that prevents the test worker from exiting cleanly.
+if (!process.env.JEST_WORKER_ID) {
+  startTrashPurge();
+}
 
 // ─── List active documents ────────────────────────────────────────────────────
+// Backward compatible: with no ?page/?limit it returns a plain array (the legacy
+// shape the dashboard consumes). Pass ?page=N (and optionally ?limit=) to get a
+// paginated envelope { items, total, page, limit, totalPages, hasMore } instead.
 router.get('/', async (req: AuthRequest, res: Response) => {
   const userId = req.user!.sub;
-  const docs = await CollabDocument.find({
-    deletedAt: null,
-    $or: [
-      { ownerId: userId },
-      { 'collaborators.userId': new Types.ObjectId(userId) },
-    ],
-  })
-    .select('-yjsState')
-    .sort({ updatedAt: -1 })
-    .lean();
 
-  res.json(docs);
+  // Optional folder scoping. Folders are owner-only organization, so a folder
+  // filter restricts to the requester's own documents in that folder (or root).
+  let query: Record<string, unknown>;
+  const folderId = typeof req.query.folderId === 'string' ? req.query.folderId : undefined;
+  if (folderId !== undefined) {
+    if (folderId === 'root' || folderId === 'null' || folderId === '') {
+      query = { deletedAt: null, ownerId: userId, folderId: null };
+    } else if (isValidObjectId(folderId)) {
+      query = { deletedAt: null, ownerId: userId, folderId: new Types.ObjectId(folderId) };
+    } else {
+      res.status(400).json({ error: 'Invalid folder id' });
+      return;
+    }
+  } else {
+    query = {
+      deletedAt: null,
+      $or: [
+        { ownerId: userId },
+        { 'collaborators.userId': new Types.ObjectId(userId) },
+      ],
+    };
+  }
+
+  const paginated = req.query.page !== undefined || req.query.limit !== undefined;
+  if (!paginated) {
+    const docs = await CollabDocument.find(query)
+      .select('-yjsState')
+      .sort({ updatedAt: -1 })
+      .lean();
+    res.json(docs);
+    return;
+  }
+
+  const page = Math.max(1, parseInt(String(req.query.page), 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit), 10) || 20));
+  const skip = (page - 1) * limit;
+
+  const [items, total] = await Promise.all([
+    CollabDocument.find(query)
+      .select('-yjsState')
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    CollabDocument.countDocuments(query),
+  ]);
+
+  res.json({
+    items,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+    hasMore: skip + items.length < total,
+  });
 });
 
 // ─── List trash ───────────────────────────────────────────────────────────────
@@ -68,9 +140,37 @@ router.get('/trash', async (req: AuthRequest, res: Response) => {
   res.json(docs);
 });
 
+// ─── Search documents (title + content) ───────────────────────────────────────
+router.get('/search', async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.sub;
+  const q = (typeof req.query.q === 'string' ? req.query.q : '').trim();
+  if (!q) { res.json([]); return; }
+
+  // Escape regex metacharacters so the query is treated as literal text
+  const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const rx = new RegExp(safe, 'i');
+
+  const docs = await CollabDocument.find({
+    deletedAt: null,
+    $and: [
+      { $or: [{ ownerId: userId }, { 'collaborators.userId': new Types.ObjectId(userId) }] },
+      { $or: [{ title: rx }, { contentText: rx }] },
+    ],
+  })
+    .select('-yjsState -contentText')
+    .sort({ updatedAt: -1 })
+    .limit(50)
+    .lean();
+
+  res.json(docs);
+});
+
 // ─── Create document ──────────────────────────────────────────────────────────
 router.post('/', async (req: AuthRequest, res: Response) => {
-  const { title = 'Untitled', template, content } = req.body;
+  const { title = 'Untitled', content } = req.body;
+
+  const titleError = validateTitle(title);
+  if (titleError) { res.status(400).json({ error: titleError.message }); return; }
 
   const doc = await CollabDocument.create({
     title: title || 'Untitled',
@@ -136,7 +236,29 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
   const perm = getUserPermission(doc, req.user!.sub);
   if (!perm || perm === 'view') { res.status(403).json({ error: 'No edit permission' }); return; }
 
-  if (req.body.title) doc.title = req.body.title;
+  if (req.body.title !== undefined) {
+    const titleError = validateTitle(req.body.title);
+    if (titleError) { res.status(400).json({ error: titleError.message }); return; }
+    doc.title = req.body.title;
+  }
+
+  // Move into / out of a folder. Folders are owner-scoped organization, so only
+  // the owner can change a document's folder. folderId: null moves it to root.
+  if (req.body.folderId !== undefined) {
+    if (doc.ownerId.toString() !== req.user!.sub) {
+      res.status(403).json({ error: 'Only the owner can move this document' });
+      return;
+    }
+    if (req.body.folderId === null) {
+      doc.folderId = null;
+    } else {
+      if (!isValidObjectId(req.body.folderId)) { res.status(400).json({ error: 'Invalid folder id' }); return; }
+      const folder = await Folder.findOne({ _id: req.body.folderId, ownerId: req.user!.sub });
+      if (!folder) { res.status(404).json({ error: 'Folder not found' }); return; }
+      doc.folderId = folder._id;
+    }
+  }
+
   await doc.save();
   res.json(doc);
 });
@@ -176,22 +298,75 @@ router.post('/:id/share', async (req: AuthRequest, res: Response) => {
   });
 });
 
-// ─── Add collaborator ─────────────────────────────────────────────────────────
+// ─── List collaborators (owner or collaborator) ───────────────────────────────
+router.get('/:id/collaborators', async (req: AuthRequest, res: Response) => {
+  const doc = await CollabDocument.findById(req.params.id);
+  if (!doc) { res.status(404).json({ error: 'Not found' }); return; }
+  if (!getUserPermission(doc, req.user!.sub)) { res.status(403).json({ error: 'Access denied' }); return; }
+
+  const owner = await User.findById(doc.ownerId, 'email displayName avatarUrl').lean();
+  res.json({
+    owner: owner
+      ? { userId: doc.ownerId.toString(), email: owner.email, displayName: owner.displayName, avatarUrl: owner.avatarUrl ?? null }
+      : null,
+    collaborators: await buildCollaboratorList(doc),
+  });
+});
+
+// ─── Invite a collaborator by email (owner only) ──────────────────────────────
 router.post('/:id/collaborators', async (req: AuthRequest, res: Response) => {
   const doc = await CollabDocument.findById(req.params.id);
   if (!doc) { res.status(404).json({ error: 'Not found' }); return; }
   if (doc.ownerId.toString() !== req.user!.sub) { res.status(403).json({ error: 'Only owner can manage collaborators' }); return; }
 
-  const { userId, permission } = req.body;
-  const existing = doc.collaborators.findIndex((c) => c.userId.toString() === userId);
+  const { email, permission = 'view' } = req.body;
+  const emailError = validateEmail(email);
+  if (emailError) { res.status(400).json({ error: emailError.message }); return; }
+  if (!validateShareLinkPermission(permission)) { res.status(400).json({ error: 'Permission must be "view" or "edit"' }); return; }
+
+  const invitee = await User.findOne({ email: email.toLowerCase().trim() });
+  if (!invitee) { res.status(404).json({ error: 'No CollabDocs user found with that email' }); return; }
+  if (invitee.id === doc.ownerId.toString()) { res.status(400).json({ error: 'You already own this document' }); return; }
+
+  const existing = doc.collaborators.findIndex((c) => c.userId.toString() === invitee.id);
+  const isNew = existing < 0;
   if (existing >= 0) {
     doc.collaborators[existing].permission = permission;
   } else {
-    doc.collaborators.push({ userId: new Types.ObjectId(userId), permission });
+    doc.collaborators.push({ userId: new Types.ObjectId(invitee.id), permission });
   }
 
   await doc.save();
-  res.json(doc.collaborators);
+
+  // Notify the invitee only when newly added (not on a permission change)
+  if (isNew) {
+    await notifyShare({
+      recipientId: invitee.id,
+      actorId: req.user!.sub,
+      actorName: req.user!.displayName,
+      documentId: doc.id,
+      documentTitle: doc.title,
+      permission,
+    });
+  }
+
+  res.status(201).json({ collaborators: await buildCollaboratorList(doc) });
+});
+
+// ─── Remove a collaborator (owner only) ───────────────────────────────────────
+router.delete('/:id/collaborators/:userId', async (req: AuthRequest, res: Response) => {
+  if (!isValidObjectId(req.params.userId)) { res.status(400).json({ error: 'Invalid user id' }); return; }
+
+  const doc = await CollabDocument.findById(req.params.id);
+  if (!doc) { res.status(404).json({ error: 'Not found' }); return; }
+  if (doc.ownerId.toString() !== req.user!.sub) { res.status(403).json({ error: 'Only owner can manage collaborators' }); return; }
+
+  const before = doc.collaborators.length;
+  doc.collaborators = doc.collaborators.filter((c) => c.userId.toString() !== req.params.userId) as typeof doc.collaborators;
+  if (doc.collaborators.length === before) { res.status(404).json({ error: 'Collaborator not found' }); return; }
+
+  await doc.save();
+  res.json({ collaborators: await buildCollaboratorList(doc) });
 });
 
 export default router;

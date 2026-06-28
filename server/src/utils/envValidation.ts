@@ -3,6 +3,8 @@
  * Runs at server startup to ensure all required variables are configured
  */
 
+import { logger } from './logger';
+
 interface EnvVar {
   name: string;
   required: boolean;
@@ -82,12 +84,11 @@ export function validateEnvVars(): void {
   }
 
   if (errors.length > 0) {
-    console.error('Environment variable validation failed:');
-    errors.forEach((err) => console.error(`  ✗ ${err}`));
+    logger.fatal({ errors }, 'Environment variable validation failed');
     process.exit(1);
   }
 
-  console.log('✓ All environment variables validated successfully');
+  logger.info('All environment variables validated successfully');
 }
 
 /**
@@ -103,7 +104,6 @@ export function warnMissingOptionalVars(): void {
   }
 
   if (warnings.length > 0) {
-    console.warn('Optional environment variables not configured:');
-    warnings.forEach((warn) => console.warn(`  ⚠ ${warn}`));
+    logger.warn({ warnings }, 'Optional environment variables not configured');
   }
 }

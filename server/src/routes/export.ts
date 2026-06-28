@@ -3,6 +3,7 @@ import * as Y from 'yjs';
 import PDFDocument from 'pdfkit';
 import { CollabDocument } from '../models';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { logger } from '../utils/logger';
 import {
   Document as DocxDocument,
   Packer,
@@ -144,7 +145,7 @@ router.get('/:id/docx', async (req: AuthRequest, res: Response) => {
     res.setHeader('Content-Length', buffer.length);
     res.end(buffer);
   } catch (err) {
-    console.error('[export/docx]', err);
+    logger.error({ err }, '[export/docx]');
     res.status(500).json({ error: 'DOCX export failed' });
   }
 });
@@ -152,7 +153,7 @@ router.get('/:id/docx', async (req: AuthRequest, res: Response) => {
 // ─── Export as PDF ────────────────────────────────────────────────────────────
 router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
   try {
-    console.log('[export/pdf] Starting PDF export for doc:', req.params.id);
+    logger.debug({ docId: req.params.id }, '[export/pdf] Starting PDF export');
     const result = await getAuthorizedDoc(req.params.id, req.user!.sub);
     if (result === null) { res.status(404).json({ error: 'Not found' }); return; }
     if (result === false) { res.status(403).json({ error: 'Access denied' }); return; }
@@ -160,7 +161,7 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
     const nodes = result.yjsState ? extractNodes(result.yjsState as Buffer) : [];
     const filename = `${result.title.replace(/[^a-z0-9]/gi, '_') || 'document'}.pdf`;
 
-    console.log('[export/pdf] Generating PDF...');
+    logger.debug('[export/pdf] Generating PDF');
     const doc = new PDFDocument({ bufferPages: true });
     const chunks: Buffer[] = [];
 
@@ -171,7 +172,7 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', pdfBuffer.length);
       res.end(pdfBuffer);
-      console.log('[export/pdf] PDF export completed successfully');
+      logger.debug('[export/pdf] PDF export completed successfully');
     });
 
     doc.fontSize(24).font('Helvetica-Bold').text(result.title, { underline: true });
@@ -193,7 +194,7 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
 
     doc.end();
   } catch (err) {
-    console.error('[export/pdf] Error:', err);
+    logger.error({ err }, '[export/pdf] Error');
     res.status(500).json({ error: 'PDF export failed', details: (err as any)?.message });
   }
 });

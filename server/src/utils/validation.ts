@@ -20,6 +20,11 @@ export interface ValidationError {
   message: string;
 }
 
+// Returns the first non-null validation error, or null if all pass.
+export function firstError(...errors: (ValidationError | null)[]): ValidationError | null {
+  return errors.find((e) => e !== null) ?? null;
+}
+
 // Email validation
 export function validateEmail(email: string): ValidationError | null {
   if (!email || typeof email !== 'string') {
@@ -48,7 +53,7 @@ export function validatePassword(password: string): ValidationError | null {
   if (PASSWORD_REQUIRE_NUMBERS && !/[0-9]/.test(password)) {
     return { field: 'password', message: 'Password must contain at least one number' };
   }
-  if (PASSWORD_REQUIRE_SPECIAL && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+  if (PASSWORD_REQUIRE_SPECIAL && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
     return { field: 'password', message: 'Password must contain at least one special character' };
   }
   return null;
@@ -69,6 +74,21 @@ export function validateDisplayName(name: string): ValidationError | null {
   return null;
 }
 
+// Avatar URL validation (optional field — empty clears it)
+export function validateAvatarUrl(url: unknown): ValidationError | null {
+  if (url === undefined || url === null || url === '') return null;
+  if (typeof url !== 'string') {
+    return { field: 'avatarUrl', message: 'Invalid avatar URL' };
+  }
+  if (url.length > 2048) {
+    return { field: 'avatarUrl', message: 'Avatar URL is too long' };
+  }
+  if (!/^https?:\/\//.test(url.trim())) {
+    return { field: 'avatarUrl', message: 'Avatar URL must start with http:// or https://' };
+  }
+  return null;
+}
+
 // Document title validation
 export function validateTitle(title: string): ValidationError | null {
   if (!title || typeof title !== 'string') {
@@ -76,6 +96,17 @@ export function validateTitle(title: string): ValidationError | null {
   }
   if (title.length > MAX_TITLE_LENGTH) {
     return { field: 'title', message: `Title must be under ${MAX_TITLE_LENGTH} characters` };
+  }
+  return null;
+}
+
+// Folder name validation (required, bounded by the title limit)
+export function validateFolderName(name: unknown): ValidationError | null {
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    return { field: 'name', message: 'Folder name is required' };
+  }
+  if (name.trim().length > MAX_TITLE_LENGTH) {
+    return { field: 'name', message: `Folder name must be under ${MAX_TITLE_LENGTH} characters` };
   }
   return null;
 }
