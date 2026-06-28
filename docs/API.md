@@ -686,4 +686,4 @@ curl -X GET http://localhost:4000/api/documents \
 
 **Last updated:** 2025-04-30
 
-For questions or contributions, see [CONTRIBUTING.md](CONTRIBUTING.md)
+For questions or contributions, see [CONTRIBUTING.md](../CONTRIBUTING.md)

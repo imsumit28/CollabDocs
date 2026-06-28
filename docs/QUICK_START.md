@@ -34,12 +34,12 @@ npm run dev
 
 | Document | Purpose |
 |----------|---------|
-| **[README.md](README.md)** | Project overview, features, architecture |
-| **[CONTRIBUTING.md](CONTRIBUTING.md)** | How to contribute, code standards, testing |
-| **[SECURITY.md](SECURITY.md)** | Security practices and threat model |
+| **[README.md](../README.md)** | Project overview, features, architecture |
+| **[CONTRIBUTING.md](../CONTRIBUTING.md)** | How to contribute, code standards, testing |
+| **[SECURITY.md](../SECURITY.md)** | Security practices and threat model |
 | **[CHANGELOG.md](CHANGELOG.md)** | Version history and features |
-| **[server/API.md](server/API.md)** | Complete REST API reference |
-| **[server/TESTING.md](server/TESTING.md)** | Testing guide and examples |
+| **[API.md](API.md)** | Complete REST API reference |
+| **[TESTING.md](TESTING.md)** | Testing guide and examples |
 | **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** | What's been added (this phase) |
 
 ---
@@ -98,7 +98,7 @@ npm run dev --workspace=server
 - Y.js CRDT for conflict-free editing
 - Automatic presence (cursors)
 
-See [server/API.md](server/API.md) for complete reference.
+See [API.md](API.md) for complete reference.
 
 ---
 
@@ -205,7 +205,7 @@ git push origin main
 # 5. Render auto-deploys on git push
 ```
 
-See [README.md](README.md) for detailed deployment steps.
+See [README.md](../README.md) for detailed deployment steps.
 
 ---
 
@@ -222,24 +222,24 @@ See [README.md](README.md) for detailed deployment steps.
 ## Learning Resources
 
 ### Architecture
-- [README Architecture Section](README.md#architecture-overview)
-- [WebSocket Flow Diagram](README.md#websocket-flow)
-- [CRDT vs OT Comparison](README.md#data-sync-strategy--crdt-vs-ot)
+- [README Architecture Section](../README.md#architecture-overview)
+- [WebSocket Flow Diagram](../README.md#websocket-flow)
+- [CRDT vs OT Comparison](../README.md#data-sync-strategy--crdt-vs-ot)
 
 ### Testing
-- [Testing Guide](server/TESTING.md)
+- [Testing Guide](TESTING.md)
 - [Auth Test Examples](server/src/__tests__/routes/auth.test.ts)
 - [Document Test Examples](server/src/__tests__/routes/documents.test.ts)
 
 ### Security
-- [Security Practices](SECURITY.md)
-- [JWT Best Practices](SECURITY.md#authentication)
-- [Rate Limiting Details](SECURITY.md#rate-limiting)
+- [Security Practices](../SECURITY.md)
+- [JWT Best Practices](../SECURITY.md#authentication)
+- [Rate Limiting Details](../SECURITY.md#rate-limiting)
 
 ### API
-- [Complete API Reference](server/API.md)
+- [Complete API Reference](API.md)
 - [Swagger UI](http://localhost:4000/api/docs) (when running)
-- [Error Handling](server/API.md#error-response-format)
+- [Error Handling](API.md#error-response-format)
 
 ---
 
@@ -286,14 +286,14 @@ npm run test:watch -- --verbose
 2. **Explore API docs**: Open http://localhost:4000/api/docs
 3. **Run tests**: `npm run test --workspace=server`
 4. **Read CONTRIBUTING.md**: Understand dev workflow
-5. **Deploy**: Follow deployment section in [README.md](README.md)
+5. **Deploy**: Follow deployment section in [README.md](../README.md)
 
 ---
 
 ## Need Help?
 
 - **Setup issues?** See CONTRIBUTING.md → Development Setup
-- **API questions?** See server/API.md or http://localhost:4000/api/docs
+- **API questions?** See API.md or http://localhost:4000/api/docs
 - **Security concerns?** See SECURITY.md
 - **Contributing?** See CONTRIBUTING.md
 - **Bug report?** Use .github/ISSUE_TEMPLATE/bug_report.md
