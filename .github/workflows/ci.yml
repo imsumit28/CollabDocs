@@ -30,7 +30,7 @@ jobs:
       # Cache the mongod binary that mongodb-memory-server downloads so the
       # server test suite doesn't re-download it on every run.
       - name: Cache MongoDB binaries
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/mongodb-binaries
           key: ${{ runner.os }}-mongodb-binaries
