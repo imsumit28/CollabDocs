@@ -16,22 +16,22 @@
 
 Multiple users edit the same document simultaneously with live cursors, conflict-free CRDT sync, AI writing assistance, and version history.
 
-**[🚀 Live Demo](https://collabdocs2026.vercel.app)** · **[📘 API Docs](https://collabdocs2026.vercel.app/api/docs)** · **[💻 GitHub](https://github.com/imsumit28/CollabDocs)**
+**[Live Demo](https://collabdocs2026.vercel.app)** · **[API Docs](https://collabdocs2026.vercel.app/api/docs)** · **[GitHub](https://github.com/imsumit28/CollabDocs)**
 
 </div>
 
 ---
 
-## ✨ Highlights
+## Highlights
 
 | | |
 |---|---|
-| **🤝 Live co-editing** | Multiple users type at once via Y.js CRDT + Socket.IO — changes propagate in ~100 ms with zero conflicts and live name-labelled cursors. |
-| **🧠 AI writing assistant** | Improve, summarise, expand, translate, change tone, and more — responses stream in token-by-token (DeepSeek, OpenAI-compatible). |
-| **📴 Offline & installable (PWA)** | Install to desktop/home screen; documents stay editable offline (Y.js + IndexedDB) and merge automatically on reconnect. |
-| **🕓 Version history** | Browse and restore past snapshots; auto-save persists every 5 s of inactivity. |
-| **💬 Comments & mentions** | Inline threaded comments, resolve/reopen, and `@mention` notifications across comments and the document body. |
-| **🔐 Production-grade auth** | Email/password + Google OAuth, email verification, secure single-use password reset, XSS-safe JWT strategy. |
+| **Live co-editing** | Multiple users type at once via Y.js CRDT + Socket.IO — changes propagate in ~100 ms with zero conflicts and live name-labelled cursors. |
+| **AI writing assistant** | Improve, summarise, expand, translate, change tone, and more — responses stream in token-by-token (DeepSeek, OpenAI-compatible). |
+| **Offline & installable (PWA)** | Install to desktop/home screen; documents stay editable offline (Y.js + IndexedDB) and merge automatically on reconnect. |
+| **Version history** | Browse and restore past snapshots; auto-save persists every 5 s of inactivity. |
+| **Comments & mentions** | Inline threaded comments, resolve/reopen, and `@mention` notifications across comments and the document body. |
+| **Production-grade auth** | Email/password + Google OAuth, email verification, secure single-use password reset, XSS-safe JWT strategy. |
 
 <details>
 <summary><strong>See the full feature list</strong></summary>
@@ -66,7 +66,7 @@ Multiple users edit the same document simultaneously with live cursors, conflict
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 graph TB
@@ -107,16 +107,29 @@ graph TB
     SO <-->|Pub/Sub fan-out| RD
     EX --> GR
     EX --> GO
+
+    classDef client fill:#1e293b,stroke:#475569,color:#e2e8f0;
+    classDef frontend fill:#0ea5e9,stroke:#0369a1,color:#ffffff;
+    classDef backend fill:#22c55e,stroke:#15803d,color:#ffffff;
+    classDef data fill:#f59e0b,stroke:#b45309,color:#1f2937;
+    classDef external fill:#a855f7,stroke:#7e22ce,color:#ffffff;
+
+    class B1,B2 client;
+    class NX,TE,YC frontend;
+    class EX,SO,YS backend;
+    class MG,RD data;
+    class GR,GO external;
 ```
 
 The server is a **dumb relay**: it applies binary Y.js deltas to an in-memory `Y.Doc` per room and fans them out — no conflict-resolution logic — then debounce-persists to MongoDB.
 
-📖 **Full data flow, real-time sequence, and directory layout → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
-🧠 **Why CRDT over OT, the JWT strategy, scaling trade-offs → [docs/DESIGN_DECISIONS.md](docs/DESIGN_DECISIONS.md)**
+**Full data flow, real-time sequence, and directory layout → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
+
+**Why CRDT over OT, the JWT strategy, scaling trade-offs → [docs/DESIGN_DECISIONS.md](docs/DESIGN_DECISIONS.md)**
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology | Why |
 |-------|-----------|-----|
@@ -134,7 +147,7 @@ The server is a **dumb relay**: it applies binary Y.js deltas to an in-memory `Y
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 > **Prerequisites:** Node.js 20+, a [MongoDB Atlas](https://cloud.mongodb.com) free cluster, and a [DeepSeek API key](https://platform.deepseek.com) (for AI features). Google OAuth and Redis are optional.
 
@@ -155,7 +168,7 @@ npm run dev
 # API Docs → http://localhost:4000/api/docs
 ```
 
-📋 **Full setup walkthrough, env variable reference → [docs/QUICK_START.md](docs/QUICK_START.md)**
+**Full setup walkthrough, env variable reference → [docs/QUICK_START.md](docs/QUICK_START.md)**
 
 <details>
 <summary><strong>Troubleshooting</strong></summary>
@@ -178,18 +191,18 @@ npm run dev --workspace=server   # Backend only
 
 ---
 
-## 🔐 Security
+## Security
 
 - **XSS-safe JWT** — access tokens in memory (never `localStorage`), refresh tokens in `HttpOnly` `Secure` `SameSite=Strict` cookies.
 - **Rate limiting** — auth endpoints 5 req/15 min, AI endpoint 30 req/hour per user.
 - **Hardening** — Helmet CSP/HSTS, bcrypt (12 rounds), CORS lockdown, input validation, and startup env validation that refuses to boot on weak/missing secrets.
 - **Resilience** — graceful shutdown persists open docs before exit; `/health` returns `503` when the DB is unreachable.
 
-📄 **Threat model & hardening checklist → [SECURITY.md](SECURITY.md)** · **JWT rationale → [docs/DESIGN_DECISIONS.md](docs/DESIGN_DECISIONS.md#2-jwt-in-memory--httponly-refresh-cookies)**
+**Threat model & hardening checklist → [SECURITY.md](SECURITY.md)** · **JWT rationale → [docs/DESIGN_DECISIONS.md](docs/DESIGN_DECISIONS.md#2-jwt-in-memory--httponly-refresh-cookies)**
 
 ---
 
-## 🧪 Testing
+## Testing
 
 **173 server tests** (~70% coverage) against an in-memory MongoDB — no local DB or paid cluster needed, runs offline and in CI. Plus client component tests (Jest + React Testing Library) and browser E2E (Playwright with mocked routes).
 
@@ -199,11 +212,11 @@ npm run test:ci --workspace=client   # Client component tests
 npm run test:e2e --workspace=client  # Playwright E2E (auto-starts the app)
 ```
 
-📊 **Coverage breakdown by module & testing guide → [docs/TESTING.md](docs/TESTING.md)**
+**Coverage breakdown by module & testing guide → [docs/TESTING.md](docs/TESTING.md)**
 
 ---
 
-## 📡 API
+## API
 
 Interactive Swagger UI at `http://localhost:4000/api/docs` when the server is running. Highlights:
 
@@ -218,11 +231,11 @@ Interactive Swagger UI at `http://localhost:4000/api/docs` when the server is ru
 
 Real-time uses Socket.IO events (`doc:join`, `yjs:sync`, `yjs:update`, `doc:awareness`, `doc:saved`).
 
-📘 **Every REST endpoint, WebSocket event, and curl examples → [docs/API.md](docs/API.md)**
+**Every REST endpoint, WebSocket event, and curl examples → [docs/API.md](docs/API.md)**
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 <details>
 <summary><strong>Expand directory tree</strong></summary>
@@ -257,7 +270,7 @@ Full annotated layout in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#directory-s
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 | Document | What's inside |
 |----------|---------------|
@@ -274,7 +287,7 @@ Project policies: [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_C
 ---
 
 <details>
-<summary><h2>🗺️ Roadmap</h2></summary>
+<summary><h2>Roadmap</h2></summary>
 
 CollabDocs is feature-complete for its core use case. Planned enhancements, roughly in priority order:
 
@@ -289,7 +302,7 @@ Have an idea? Open a [Discussion](https://github.com/imsumit28/CollabDocs/discus
 
 </details>
 
-## 🤝 Contributing
+## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, code standards, and the PR process.
 
@@ -303,6 +316,6 @@ Pre-commit hooks (Husky + lint-staged) run ESLint and Prettier automatically. Ev
 
 ---
 
-## 📄 License
+## License
 
 MIT — see [LICENSE](LICENSE).
