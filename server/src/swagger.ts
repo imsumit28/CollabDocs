@@ -22,7 +22,7 @@ const swaggerOptions = {
         description: 'Development server',
       },
       {
-        url: 'https://api.collabdocs.app',
+        url: 'https://your-backend.onrender.com',
         description: 'Production server',
       },
     ],
