@@ -47,6 +47,18 @@ graph TB
     SO <-->|Pub/Sub fan-out| RD
     EX --> GR
     EX --> GO
+
+    classDef client fill:#1e293b,stroke:#475569,color:#e2e8f0;
+    classDef frontend fill:#0ea5e9,stroke:#0369a1,color:#ffffff;
+    classDef backend fill:#22c55e,stroke:#15803d,color:#ffffff;
+    classDef data fill:#f59e0b,stroke:#b45309,color:#1f2937;
+    classDef external fill:#a855f7,stroke:#7e22ce,color:#ffffff;
+
+    class B1,B2 client;
+    class NX,TE,YC frontend;
+    class EX,SO,YS backend;
+    class MG,RD data;
+    class GR,GO external;
 ```
 
 ---
