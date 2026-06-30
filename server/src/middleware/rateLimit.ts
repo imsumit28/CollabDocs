@@ -41,6 +41,30 @@ export const forgotPasswordRateLimit = rateLimit({
   skip: skipInTest,
 });
 
+// OTP verification — cap guesses per IP across the window. This is a coarse
+// network-level guard; the per-user attempt counter in the route is the precise
+// brute-force defense.
+export const verifyOtpRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 15,
+  message: { error: 'Too many verification attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipInTest,
+});
+
+// Resending an OTP — slightly more permissive than the initial request so a user
+// who mistyped their email or lost the first code isn't locked out, but still
+// bounded to prevent using us as an email-spam relay.
+export const resendOtpRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  message: { error: 'Too many code requests. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipInTest,
+});
+
 export const aiRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 20,

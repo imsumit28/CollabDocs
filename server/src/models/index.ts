@@ -12,8 +12,17 @@ export interface IUser extends MongoDoc {
   emailVerified: boolean;
   emailVerificationToken: string | null;
   emailVerificationExpiry: Date | null;
+  // Short-lived "reset ticket" issued *after* a one-time password (OTP) is
+  // verified. The reset-password step authorizes itself with this, not with a
+  // raw "I'm verified" flag from the client.
   passwordResetToken: string | null;
   passwordResetExpiry: Date | null;
+  // Password-reset OTP (replaces the old emailed magic link). Only a bcrypt hash
+  // of the code is stored; it is single-use, attempt-limited, and time-boxed.
+  passwordResetOtpHash: string | null;
+  passwordResetOtpExpiry: Date | null;
+  passwordResetOtpAttempts: number;
+  passwordResetOtpSentAt: Date | null;
   tokenVersion: number;
   createdAt: Date;
   updatedAt: Date;
@@ -33,6 +42,10 @@ const UserSchema = new Schema<IUser>(
     emailVerificationExpiry: { type: Date, default: null },
     passwordResetToken: { type: String, default: null, index: true },
     passwordResetExpiry: { type: Date, default: null },
+    passwordResetOtpHash: { type: String, default: null },
+    passwordResetOtpExpiry: { type: Date, default: null },
+    passwordResetOtpAttempts: { type: Number, default: 0 },
+    passwordResetOtpSentAt: { type: Date, default: null },
     tokenVersion: { type: Number, default: 0 },
   },
   { timestamps: true }

@@ -34,6 +34,13 @@ dotenv.config(envPath ? { path: envPath, override: true } : { override: true });
 const app = express();
 const server = http.createServer(app);
 
+// In production we run behind a reverse proxy (Render/Railway/Nginx/etc.).
+// Trusting the first proxy hop lets express-rate-limit key off the real client
+// IP via X-Forwarded-For and lets `secure` cookies detect HTTPS correctly.
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Middleware
 app.use(helmet({ crossOriginEmbedderPolicy: false }));
 app.use(cors({

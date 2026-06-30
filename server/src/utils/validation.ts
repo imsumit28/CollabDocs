@@ -6,8 +6,12 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Password strength requirements
 const PASSWORD_MIN_LENGTH = parseInt(process.env.PASSWORD_MIN_LENGTH || '8', 10);
 const PASSWORD_REQUIRE_UPPERCASE = process.env.PASSWORD_REQUIRE_UPPERCASE === 'true';
+const PASSWORD_REQUIRE_LOWERCASE = process.env.PASSWORD_REQUIRE_LOWERCASE === 'true';
 const PASSWORD_REQUIRE_NUMBERS = process.env.PASSWORD_REQUIRE_NUMBERS === 'true';
 const PASSWORD_REQUIRE_SPECIAL = process.env.PASSWORD_REQUIRE_SPECIAL_CHARS === 'true';
+
+// One-time password (OTP) for password reset: a fixed-length numeric code.
+const OTP_LENGTH = parseInt(process.env.OTP_LENGTH || '6', 10);
 
 // Input limits
 const MAX_TITLE_LENGTH = parseInt(process.env.MAX_TITLE_LENGTH || '500', 10);
@@ -50,11 +54,25 @@ export function validatePassword(password: string): ValidationError | null {
   if (PASSWORD_REQUIRE_UPPERCASE && !/[A-Z]/.test(password)) {
     return { field: 'password', message: 'Password must contain at least one uppercase letter' };
   }
+  if (PASSWORD_REQUIRE_LOWERCASE && !/[a-z]/.test(password)) {
+    return { field: 'password', message: 'Password must contain at least one lowercase letter' };
+  }
   if (PASSWORD_REQUIRE_NUMBERS && !/[0-9]/.test(password)) {
     return { field: 'password', message: 'Password must contain at least one number' };
   }
   if (PASSWORD_REQUIRE_SPECIAL && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
     return { field: 'password', message: 'Password must contain at least one special character' };
+  }
+  return null;
+}
+
+// Password-reset OTP validation: exactly OTP_LENGTH digits.
+export function validateOtp(otp: unknown): ValidationError | null {
+  if (!otp || typeof otp !== 'string') {
+    return { field: 'otp', message: 'Verification code is required' };
+  }
+  if (!new RegExp(`^\\d{${OTP_LENGTH}}$`).test(otp.trim())) {
+    return { field: 'otp', message: `Verification code must be ${OTP_LENGTH} digits` };
   }
   return null;
 }

@@ -1,6 +1,7 @@
 import request from 'supertest';
 import express, { Express } from 'express';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import authRoutes from '../../routes/auth';
 import { User } from '../../models';
 import { createTestUser, cleanupTestDB } from '../helpers';
@@ -342,8 +343,8 @@ describe('Auth Routes', () => {
     });
   });
 
-  describe('POST /forgot-password', () => {
-    it('returns a generic message for an existing account and stores a reset token', async () => {
+  describe('POST /forgot-password (OTP)', () => {
+    it('returns a generic message for an existing account and stores a hashed OTP', async () => {
       await createTestUser(app, { email: 'reset@example.com' });
       const res = await request(app)
         .post('/api/auth/forgot-password')
@@ -352,8 +353,10 @@ describe('Auth Routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.message).toMatch(/if an account exists/i);
       const user = await User.findOne({ email: 'reset@example.com' });
-      expect(user!.passwordResetToken).toBeTruthy();
-      expect(user!.passwordResetExpiry).toBeTruthy();
+      expect(user!.passwordResetOtpHash).toBeTruthy();
+      expect(user!.passwordResetOtpExpiry).toBeTruthy();
+      // The raw code must never be persisted, only a bcrypt hash.
+      expect(user!.passwordResetOtpHash).toMatch(/^\$2[aby]\$/);
     });
 
     it('returns the same generic message for a non-existent account (no enumeration)', async () => {
@@ -365,15 +368,86 @@ describe('Auth Routes', () => {
       expect(res.body.message).toMatch(/if an account exists/i);
     });
 
-    it('does not issue a token for an OAuth-only account', async () => {
+    it('returns OAUTH_ACCOUNT and issues no OTP for a Google-only account', async () => {
       await User.create({ email: 'oauth@example.com', displayName: 'OAuth', passwordHash: null, oauthProvider: 'google', oauthId: 'g1' });
       const res = await request(app)
         .post('/api/auth/forgot-password')
         .send({ email: 'oauth@example.com' });
 
       expect(res.status).toBe(200);
+      expect(res.body.code).toBe('OAUTH_ACCOUNT');
       const user = await User.findOne({ email: 'oauth@example.com' });
-      expect(user!.passwordResetToken).toBeNull();
+      expect(user!.passwordResetOtpHash).toBeNull();
+    });
+  });
+
+  describe('POST /verify-otp', () => {
+    // Seed a user with a known OTP and return the raw code.
+    async function seedUserWithOtp(email: string, opts: { expiry?: Date; attempts?: number } = {}) {
+      await createTestUser(app, { email });
+      const otp = '483912';
+      const user = await User.findOne({ email });
+      user!.passwordResetOtpHash = await bcrypt.hash(otp, 10);
+      user!.passwordResetOtpExpiry = opts.expiry ?? new Date(Date.now() + 10 * 60 * 1000);
+      user!.passwordResetOtpAttempts = opts.attempts ?? 0;
+      await user!.save();
+      return { user: user!, otp };
+    }
+
+    it('returns a reset ticket for a correct OTP and consumes the OTP', async () => {
+      const { otp } = await seedUserWithOtp('vo@example.com');
+      const res = await request(app)
+        .post('/api/auth/verify-otp')
+        .send({ email: 'vo@example.com', otp });
+
+      expect(res.status).toBe(200);
+      expect(res.body.resetToken).toEqual(expect.any(String));
+
+      const user = await User.findOne({ email: 'vo@example.com' });
+      expect(user!.passwordResetOtpHash).toBeNull(); // consumed
+      expect(user!.passwordResetToken).toBeTruthy(); // ticket minted
+    });
+
+    it('rejects an incorrect OTP and increments the attempt counter', async () => {
+      await seedUserWithOtp('vo2@example.com');
+      const res = await request(app)
+        .post('/api/auth/verify-otp')
+        .send({ email: 'vo2@example.com', otp: '000000' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('INVALID_OTP');
+      const user = await User.findOne({ email: 'vo2@example.com' });
+      expect(user!.passwordResetOtpAttempts).toBe(1);
+    });
+
+    it('rejects an expired OTP and clears it', async () => {
+      const { otp } = await seedUserWithOtp('vo3@example.com', { expiry: new Date(Date.now() - 1000) });
+      const res = await request(app)
+        .post('/api/auth/verify-otp')
+        .send({ email: 'vo3@example.com', otp });
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('OTP_EXPIRED');
+      const user = await User.findOne({ email: 'vo3@example.com' });
+      expect(user!.passwordResetOtpHash).toBeNull();
+    });
+
+    it('locks out after too many attempts', async () => {
+      const { otp } = await seedUserWithOtp('vo4@example.com', { attempts: 5 });
+      const res = await request(app)
+        .post('/api/auth/verify-otp')
+        .send({ email: 'vo4@example.com', otp });
+
+      expect(res.status).toBe(429);
+      expect(res.body.code).toBe('OTP_LOCKED');
+    });
+
+    it('rejects a malformed OTP (400)', async () => {
+      await seedUserWithOtp('vo5@example.com');
+      const res = await request(app)
+        .post('/api/auth/verify-otp')
+        .send({ email: 'vo5@example.com', otp: '12' });
+      expect(res.status).toBe(400);
     });
   });
 

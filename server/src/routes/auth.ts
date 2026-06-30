@@ -14,10 +14,10 @@ import {
   setRefreshCookie,
   clearRefreshCookie,
 } from '../utils/jwt';
-import { signupRateLimit, authRateLimit, resendVerificationRateLimit, forgotPasswordRateLimit } from '../middleware/rateLimit';
+import { signupRateLimit, authRateLimit, resendVerificationRateLimit, forgotPasswordRateLimit, verifyOtpRateLimit, resendOtpRateLimit } from '../middleware/rateLimit';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/mailer';
-import { validateEmail, validatePassword, validateDisplayName, validateAvatarUrl, firstError } from '../utils/validation';
+import { sendVerificationEmail, sendPasswordResetOtpEmail } from '../utils/mailer';
+import { validateEmail, validatePassword, validateOtp, validateDisplayName, validateAvatarUrl, firstError } from '../utils/validation';
 
 const envCandidates = [
   path.resolve(process.cwd(), '.env'),
@@ -42,6 +42,32 @@ function normalizeUsername(value?: string): string | null {
     .replace(/[^a-z0-9_]+/g, '_')
     .replace(/^_+|_+$/g, '');
   return normalized || null;
+}
+
+// ─── Password-reset OTP configuration ─────────────────────────────────────────
+const OTP_LENGTH = parseInt(process.env.OTP_LENGTH || '6', 10);
+const OTP_TTL_MS = parseInt(process.env.OTP_TTL_MINUTES || '10', 10) * 60 * 1000;
+const OTP_MAX_ATTEMPTS = parseInt(process.env.OTP_MAX_ATTEMPTS || '5', 10);
+const OTP_RESEND_COOLDOWN_MS = parseInt(process.env.OTP_RESEND_COOLDOWN_SECONDS || '60', 10) * 1000;
+// How long the post-verification reset ticket is valid for completing the reset.
+const RESET_TICKET_TTL_MS = parseInt(process.env.RESET_TICKET_TTL_MINUTES || '10', 10) * 60 * 1000;
+
+// Cryptographically secure numeric OTP, zero-padded to OTP_LENGTH digits.
+function generateOtp(): string {
+  const max = 10 ** OTP_LENGTH;
+  return crypto.randomInt(0, max).toString().padStart(OTP_LENGTH, '0');
+}
+
+const sha256 = (value: string): string => crypto.createHash('sha256').update(value).digest('hex');
+
+// Clear every password-reset artifact (OTP + ticket) from a user document.
+function clearResetState(user: IUser): void {
+  user.passwordResetOtpHash = null;
+  user.passwordResetOtpExpiry = null;
+  user.passwordResetOtpAttempts = 0;
+  user.passwordResetOtpSentAt = null;
+  user.passwordResetToken = null;
+  user.passwordResetExpiry = null;
 }
 
 // ─── Passport Google Setup ────────────────────────────────────────────────────
@@ -370,39 +396,156 @@ router.post('/resend-verification', resendVerificationRateLimit, authMiddleware,
   }
 });
 
-// ─── Password Reset ─────────────────────────────────────────────────────────
+// ─── Password Reset (OTP flow) ────────────────────────────────────────────────
+// Flow: request OTP → verify OTP (get reset ticket) → reset password with ticket.
+// The emailed code is short-lived, single-use, hashed at rest, and brute-force
+// protected by a per-user attempt counter plus IP rate limits.
+
+// Issues (or re-issues) an OTP for a manual account. Shared by /forgot-password
+// and /resend-otp. Returns a response code the caller maps to a status/body.
+async function issuePasswordResetOtp(email: unknown): Promise<
+  | { code: 'OK' }
+  | { code: 'OAUTH_ACCOUNT' }
+  | { code: 'COOLDOWN'; retryAfterSec: number }
+> {
+  if (!email || typeof email !== 'string') return { code: 'OK' };
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+
+  // Google-only accounts have no password to reset. We intentionally surface
+  // this so the UI can steer the user to "Continue with Google" (a deliberate
+  // UX choice that reveals account type for this case only).
+  if (user && !user.passwordHash && user.oauthProvider) {
+    return { code: 'OAUTH_ACCOUNT' };
+  }
+
+  // Unknown email or a non-OAuth account without a password: respond as success
+  // without sending anything, so we don't leak which emails are registered.
+  if (!user || !user.passwordHash) return { code: 'OK' };
+
+  // Throttle resends per account, independent of IP rate limiting.
+  if (user.passwordResetOtpSentAt) {
+    const elapsed = Date.now() - user.passwordResetOtpSentAt.getTime();
+    if (elapsed < OTP_RESEND_COOLDOWN_MS) {
+      return { code: 'COOLDOWN', retryAfterSec: Math.ceil((OTP_RESEND_COOLDOWN_MS - elapsed) / 1000) };
+    }
+  }
+
+  const otp = generateOtp();
+  user.passwordResetOtpHash = await bcrypt.hash(otp, 10);
+  user.passwordResetOtpExpiry = new Date(Date.now() + OTP_TTL_MS);
+  user.passwordResetOtpAttempts = 0;
+  user.passwordResetOtpSentAt = new Date();
+  // A fresh OTP supersedes any previously issued reset ticket.
+  user.passwordResetToken = null;
+  user.passwordResetExpiry = null;
+  await user.save();
+
+  sendPasswordResetOtpEmail(user.email, otp, user.displayName).catch(() => {});
+  return { code: 'OK' };
+}
+
+const GENERIC_OTP_MESSAGE = 'If an account exists for that email, a verification code has been sent.';
+
 router.post('/forgot-password', forgotPasswordRateLimit, async (req: Request, res: Response) => {
   try {
-    const { email } = req.body;
-    // Always respond the same way, whether or not the account exists, to avoid
-    // leaking which emails are registered.
-    const genericResponse = { message: 'If an account exists for that email, a reset link has been sent.' };
-
-    if (!email || typeof email !== 'string') {
-      res.json(genericResponse);
+    const result = await issuePasswordResetOtp(req.body?.email);
+    if (result.code === 'OAUTH_ACCOUNT') {
+      res.status(200).json({
+        code: 'OAUTH_ACCOUNT',
+        message:
+          'This account was created using Google Sign-In. Please continue using "Continue with Google". ' +
+          'Password reset is only available for accounts registered with email and password.',
+      });
       return;
     }
-
-    const user = await User.findOne({ email: email.toLowerCase() });
-    // Only password accounts can reset — OAuth-only users have no password.
-    if (!user || !user.passwordHash) {
-      res.json(genericResponse);
+    if (result.code === 'COOLDOWN') {
+      res.status(429).json({ error: `Please wait ${result.retryAfterSec}s before requesting another code.`, retryAfterSec: result.retryAfterSec });
       return;
     }
-
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-    user.passwordResetToken = hashedToken;
-    user.passwordResetExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-    await user.save();
-
-    sendPasswordResetEmail(user.email, rawToken).catch(() => {});
-    res.json(genericResponse);
+    res.json({ message: GENERIC_OTP_MESSAGE });
   } catch {
     res.status(500).json({ error: 'Could not process password reset request' });
   }
 });
 
+// Resend uses a slightly more permissive limiter; logic is otherwise identical.
+router.post('/resend-otp', resendOtpRateLimit, async (req: Request, res: Response) => {
+  try {
+    const result = await issuePasswordResetOtp(req.body?.email);
+    if (result.code === 'OAUTH_ACCOUNT') {
+      res.status(200).json({ code: 'OAUTH_ACCOUNT' });
+      return;
+    }
+    if (result.code === 'COOLDOWN') {
+      res.status(429).json({ error: `Please wait ${result.retryAfterSec}s before requesting another code.`, retryAfterSec: result.retryAfterSec });
+      return;
+    }
+    res.json({ message: GENERIC_OTP_MESSAGE });
+  } catch {
+    res.status(500).json({ error: 'Could not resend verification code' });
+  }
+});
+
+// Verify the OTP. On success, returns a single-use reset ticket the client must
+// present to /reset-password. The OTP itself is consumed (cleared) here.
+router.post('/verify-otp', verifyOtpRateLimit, async (req: Request, res: Response) => {
+  try {
+    const { email, otp } = req.body;
+    const validationError = firstError(validateEmail(email), validateOtp(otp));
+    if (validationError) {
+      res.status(400).json({ error: validationError.message, field: validationError.field });
+      return;
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    // Generic failure when there's no pending OTP — avoids leaking account state.
+    if (!user || !user.passwordResetOtpHash || !user.passwordResetOtpExpiry) {
+      res.status(400).json({ error: 'Invalid or expired code', code: 'INVALID_OTP' });
+      return;
+    }
+
+    if (user.passwordResetOtpExpiry.getTime() < Date.now()) {
+      clearResetState(user);
+      await user.save();
+      res.status(400).json({ error: 'Your code has expired. Please request a new one.', code: 'OTP_EXPIRED' });
+      return;
+    }
+
+    // Too many wrong guesses — burn the OTP so it can't be brute-forced further.
+    if (user.passwordResetOtpAttempts >= OTP_MAX_ATTEMPTS) {
+      clearResetState(user);
+      await user.save();
+      res.status(429).json({ error: 'Too many incorrect attempts. Please request a new code.', code: 'OTP_LOCKED' });
+      return;
+    }
+
+    const match = await bcrypt.compare(otp, user.passwordResetOtpHash);
+    if (!match) {
+      user.passwordResetOtpAttempts += 1;
+      await user.save();
+      const remaining = Math.max(0, OTP_MAX_ATTEMPTS - user.passwordResetOtpAttempts);
+      res.status(400).json({ error: 'Invalid code', code: 'INVALID_OTP', attemptsRemaining: remaining });
+      return;
+    }
+
+    // Success: consume the OTP and mint a single-use reset ticket.
+    const rawTicket = crypto.randomBytes(32).toString('hex');
+    user.passwordResetOtpHash = null;
+    user.passwordResetOtpExpiry = null;
+    user.passwordResetOtpAttempts = 0;
+    user.passwordResetOtpSentAt = null;
+    user.passwordResetToken = sha256(rawTicket);
+    user.passwordResetExpiry = new Date(Date.now() + RESET_TICKET_TTL_MS);
+    await user.save();
+
+    res.json({ resetToken: rawTicket, message: 'Code verified.' });
+  } catch {
+    res.status(500).json({ error: 'Could not verify code' });
+  }
+});
+
+// Complete the reset using the ticket from /verify-otp.
 router.post('/reset-password', async (req: Request, res: Response) => {
   try {
     const { token, password } = req.body;
@@ -417,9 +560,8 @@ router.post('/reset-password', async (req: Request, res: Response) => {
       return;
     }
 
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
     const user = await User.findOne({
-      passwordResetToken: hashedToken,
+      passwordResetToken: sha256(token),
       passwordResetExpiry: { $gt: new Date() },
     });
     if (!user) {
@@ -428,9 +570,9 @@ router.post('/reset-password', async (req: Request, res: Response) => {
     }
 
     user.passwordHash = await bcrypt.hash(password, 12);
-    user.passwordResetToken = null;
-    user.passwordResetExpiry = null;
-    // Invalidate all existing sessions — a reset should log out other devices.
+    // Wipe any reset artifacts and invalidate all existing sessions — a reset
+    // should log the account out everywhere.
+    clearResetState(user);
     user.tokenVersion += 1;
     await user.save();
 

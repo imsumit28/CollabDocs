@@ -101,6 +101,9 @@ export function warnMissingOptionalVars(): void {
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
       warnings.push('GOOGLE_CLIENT_*: Google OAuth is recommended for user convenience');
     }
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      warnings.push('SMTP_*: email is not configured — verification and password-reset codes will not be delivered');
+    }
   }
 
   if (warnings.length > 0) {
