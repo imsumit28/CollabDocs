@@ -1653,8 +1653,6 @@ export default function DashboardPage() {
   const [moveDoc, setMoveDoc] = useState<Doc | null>(null);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [renameFolder, setRenameFolder] = useState<Folder | null>(null);
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting' | 'offline'>('connected');
-  const [lastSyncTime, setLastSyncTime] = useState(new Date());
   const { favorites, toggle: toggleFavorite } = useFavorites();
   const { pinned, toggle: togglePin } = usePinned();
 
@@ -1804,19 +1802,6 @@ export default function DashboardPage() {
     fetcher,
   );
   const baseDocs = searching ? (searchResults ?? []) : displayDocs;
-
-  // Simulate connection status changes
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLastSyncTime(new Date());
-      // Randomly change connection status for demo
-      if (Math.random() > 0.9) {
-        setConnectionStatus('reconnecting');
-        setTimeout(() => setConnectionStatus('connected'), 2000);
-      }
-    }, 10000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -2020,7 +2005,7 @@ export default function DashboardPage() {
       {/* Navbar */}
       <header className="apple-glass sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-5 flex items-center justify-between h-16">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center flex-shrink-0">
             <img
               src="/collabdocs-logo-full.png?v=2"
               alt="CollabDocs"
@@ -2028,54 +2013,16 @@ export default function DashboardPage() {
               height={64}
               className="h-9 sm:h-12 w-auto object-contain"
             />
-            <div className="hidden sm:block">
-              <p className="text-xs text-[#6E6E73] font-medium">Collaborate, Create, and Refine</p>
-            </div>
           </div>
-          <div className="flex-1 hidden sm:block max-w-sm mx-8">
+          <div className="flex-1 hidden sm:block max-w-xl mx-4 lg:mx-8">
             <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#AEAEB2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#AEAEB2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search documents…" className="input-apple !pl-9 py-1.5 text-sm h-8" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search documents…" className="input-apple !pl-10 py-2 text-sm h-10" />
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {/* Real-time Sync Indicator */}
-            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-white rounded-full border border-[rgba(0,0,0,0.08)] shadow-sm">
-              <span className={`relative flex h-2 w-2 ${
-                connectionStatus === 'connected' ? 'bg-[#34C759]' : 
-                connectionStatus === 'reconnecting' ? 'bg-[#FF9500]' : 'bg-[#FF3B30]'
-              }`}>
-                {connectionStatus === 'reconnecting' && (
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF9500] opacity-75" />
-                )}
-              </span>
-              <span className="text-xs font-medium text-[#1D1D1F]">
-                {connectionStatus === 'connected' ? 'Connected' : 
-                 connectionStatus === 'reconnecting' ? 'Reconnecting...' : 'Offline'}
-              </span>
-              <span className="text-xs text-[#8E8E93]">
-                • {lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            </div>
-
-            {/* Collaboration Entry Points */}
-            <div className="hidden sm:flex items-center gap-2">
-              <button className="btn-ghost text-xs py-1.5 px-3 gap-1.5">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                </svg>
-                Invite
-              </button>
-              <button className="btn-ghost text-xs py-1.5 px-3 gap-1.5">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                </svg>
-                Share
-              </button>
-            </div>
-
+          <div className="flex items-center gap-2 flex-shrink-0">
             {user && <NotificationBell />}
 
             {user?.displayName && (
@@ -2085,9 +2032,14 @@ export default function DashboardPage() {
                   onClick={() => setProfileMenuOpen((prev) => !prev)}
                   className="flex items-center gap-2 rounded-lg px-1.5 sm:px-2 py-1.5 hover:bg-[#F4F4F5] transition-colors"
                 >
-                  <div className="w-6 h-6 rounded-full bg-[#2563EB] flex items-center justify-center text-white text-[11px] font-bold">
-                    {user.displayName[0].toUpperCase()}
-                  </div>
+                  {user.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={user.avatarUrl} alt={user.displayName} className="w-6 h-6 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-[#2563EB] flex items-center justify-center text-white text-[11px] font-bold">
+                      {user.displayName[0].toUpperCase()}
+                    </div>
+                  )}
                   <span className="hidden sm:inline text-sm text-[#6E6E73] font-medium">{user.displayName}</span>
                 </button>
 
