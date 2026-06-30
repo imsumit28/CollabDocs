@@ -35,6 +35,9 @@ export default function SettingsPage() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
 
+  // Success modal — lists what was changed
+  const [successChanges, setSuccessChanges] = useState<string[] | null>(null);
+
   useEffect(() => {
     if (loading) return;
     if (!user) { router.replace('/login'); return; }
@@ -53,10 +56,25 @@ export default function SettingsPage() {
     e.preventDefault();
     setSavingProfile(true);
     setProfileError('');
+
+    // Figure out exactly what the user changed before we save.
+    const changes: string[] = [];
+    if (displayName !== (profile?.displayName || '')) changes.push('Display name');
+    if (username !== (profile?.username || '')) changes.push('Username');
+    if (avatarUrl !== (profile?.avatarUrl || '')) changes.push('Avatar');
+
+    if (changes.length === 0) {
+      setSavingProfile(false);
+      toast.info('No changes to save');
+      return;
+    }
+
     try {
       await api.patch('/auth/me', { displayName, username, avatarUrl });
       await refreshUser();
-      toast.success('Profile updated');
+      // Keep the baseline in sync so the next save diffs correctly.
+      setProfile((prev) => (prev ? { ...prev, displayName, username: username || null, avatarUrl: avatarUrl || null } : prev));
+      setSuccessChanges(changes);
     } catch (err: any) {
       setProfileError(err.response?.data?.error || 'Could not update profile');
     } finally {
@@ -76,7 +94,7 @@ export default function SettingsPage() {
       const res = await api.post('/auth/change-password', { currentPassword, newPassword });
       if (res.data.accessToken) applyAccessToken(res.data.accessToken);
       setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
-      toast.success('Password updated');
+      setSuccessChanges(['Password']);
     } catch (err: any) {
       setPasswordError(err.response?.data?.error || 'Could not change password');
     } finally {
@@ -164,6 +182,54 @@ export default function SettingsPage() {
           )}
         </section>
       </div>
+
+      {/* Success modal */}
+      {successChanges && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 px-5 anim-fade-in"
+          onClick={() => setSuccessChanges(null)}
+        >
+          <div
+            className="w-full max-w-[420px] rounded-[20px] bg-white p-7 shadow-apple-md anim-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#F0FDF4]">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#34C759] text-[18px] font-bold text-white">✓</span>
+            </div>
+            <h3 className="text-center text-[19px] font-bold text-[#0F172A]">
+              {successChanges.length === 1
+                ? `${successChanges[0]} changed successfully`
+                : 'Changes saved successfully'}
+            </h3>
+            {successChanges.length > 1 && (
+              <ul className="mt-3 space-y-1.5">
+                {successChanges.map((c) => (
+                  <li key={c} className="flex items-center justify-center gap-2 text-[14px] text-[#475569]">
+                    <span className="text-[#34C759]">✓</span> {c} updated
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-3 text-center text-[14px] text-[#6E6E73]">You can go back to the home page now.</p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setSuccessChanges(null)}
+                className="h-[44px] flex-1 rounded-xl border border-[#E2E8F0] bg-white text-[14px] font-semibold text-[#0F172A] hover:bg-[#F8FAFC]"
+              >
+                Stay here
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard')}
+                className="h-[44px] flex-1 rounded-xl bg-[#0F172A] text-[14px] font-semibold text-white hover:bg-[#1E293B]"
+              >
+                Go to home page
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
