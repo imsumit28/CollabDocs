@@ -5,6 +5,7 @@ server/.env
 client/.env.local
 dist/
 .next/
+*.tsbuildinfo
 *.log
 .DS_Store
 coverage/
