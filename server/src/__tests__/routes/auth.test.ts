@@ -6,6 +6,16 @@ import authRoutes from '../../routes/auth';
 import { User } from '../../models';
 import { createTestUser, cleanupTestDB } from '../helpers';
 import cookieParser from 'cookie-parser';
+import { sendOAuthResetNoticeEmail } from '../../utils/mailer';
+
+// Mock the mailer so no real email is dispatched and we can assert on which
+// notification was chosen. Each fn resolves — the routes fire-and-forget with
+// `.catch()`, so a non-promise return would throw.
+jest.mock('../../utils/mailer', () => ({
+  sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+  sendPasswordResetOtpEmail: jest.fn().mockResolvedValue(undefined),
+  sendOAuthResetNoticeEmail: jest.fn().mockResolvedValue(undefined),
+}));
 
 describe('Auth Routes', () => {
   let app: Express;
@@ -19,6 +29,7 @@ describe('Auth Routes', () => {
 
   afterEach(async () => {
     await cleanupTestDB();
+    jest.clearAllMocks();
   });
 
   describe('POST /signup', () => {
@@ -368,16 +379,49 @@ describe('Auth Routes', () => {
       expect(res.body.message).toMatch(/if an account exists/i);
     });
 
-    it('returns OAUTH_ACCOUNT and issues no OTP for a Google-only account', async () => {
+    it('does not disclose a Google-only account inline — notifies over email, issues no OTP', async () => {
       await User.create({ email: 'oauth@example.com', displayName: 'OAuth', passwordHash: null, oauthProvider: 'google', oauthId: 'g1' });
       const res = await request(app)
         .post('/api/auth/forgot-password')
         .send({ email: 'oauth@example.com' });
 
+      // Response is byte-for-byte identical to the unknown-email case — no
+      // OAUTH_ACCOUNT code, just the generic message.
       expect(res.status).toBe(200);
-      expect(res.body.code).toBe('OAUTH_ACCOUNT');
+      expect(res.body.code).toBeUndefined();
+      expect(res.body.message).toMatch(/if an account exists/i);
+
+      // No password OTP is minted (there's no password to reset)...
       const user = await User.findOne({ email: 'oauth@example.com' });
       expect(user!.passwordResetOtpHash).toBeNull();
+      // ...but the owner is told, over email, to sign in with Google.
+      expect(sendOAuthResetNoticeEmail as jest.Mock).toHaveBeenCalledWith('oauth@example.com', 'OAuth');
+    });
+
+    it('does not leak account existence via the resend cooldown (no 429 oracle)', async () => {
+      await createTestUser(app, { email: 'cooldown@example.com' });
+
+      // First request issues an OTP and starts the per-account cooldown.
+      const first = await request(app)
+        .post('/api/auth/forgot-password')
+        .send({ email: 'cooldown@example.com' });
+      expect(first.status).toBe(200);
+      expect(first.body.message).toMatch(/if an account exists/i);
+
+      // Immediate second request is inside the cooldown window. It must return
+      // the SAME generic 200 as an unknown email — never a distinguishing 429 —
+      // otherwise the status code confirms the account exists.
+      const second = await request(app)
+        .post('/api/auth/forgot-password')
+        .send({ email: 'cooldown@example.com' });
+      expect(second.status).toBe(200);
+      expect(second.body.message).toMatch(/if an account exists/i);
+
+      const unknown = await request(app)
+        .post('/api/auth/forgot-password')
+        .send({ email: 'stranger@example.com' });
+      expect(second.status).toBe(unknown.status);
+      expect(second.body).toEqual(unknown.body);
     });
   });
 
@@ -514,6 +558,22 @@ describe('Auth Routes', () => {
         .post('/api/auth/reset-password')
         .send({ password: 'BrandNewPass123' });
       expect(res.status).toBe(400);
+    });
+  });
+
+  // Google login is unchanged by the enumeration work — only the forgot-password
+  // "you use Google" *screen* was removed, never the OAuth sign-in itself.
+  describe('GET /google (OAuth login entrypoint)', () => {
+    it('still redirects the browser to Google\'s consent screen', async () => {
+      const res = await request(app).get('/api/auth/google');
+
+      // passport hands off with a 302 to Google's OAuth server.
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toMatch(/^https:\/\/accounts\.google\.com\/o\/oauth2/);
+      // Requests the email + profile scopes the app relies on.
+      expect(res.headers.location).toContain('scope=');
+      expect(decodeURIComponent(res.headers.location)).toContain('profile');
+      expect(decodeURIComponent(res.headers.location)).toContain('email');
     });
   });
 });

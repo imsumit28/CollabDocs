@@ -239,6 +239,63 @@ function renderVerificationHtml(verifyUrl: string, greetingName: string): string
   });
 }
 
+function renderOAuthResetNoticeHtml(loginUrl: string, greetingName: string): string {
+  const content = `
+          <tr>
+            <td style="padding:36px 32px 8px 32px;">
+              <h1 style="margin:0 0 6px 0;font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.4px;">Use Google to sign in</h1>
+              <p style="margin:0 0 4px 0;font-size:15px;color:#475569;">Hello ${greetingName},</p>
+              <p style="margin:0 0 24px 0;font-size:15px;color:#64748b;line-height:1.5;">We received a request to reset the password for your CollabDocs account. This account was created with Google Sign-In, so it doesn't have a password to reset — just continue with Google to sign in.</p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:0 32px 28px 32px;">
+              <a href="${loginUrl}" style="display:inline-block;background-color:#0f172a;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:13px 30px;border-radius:10px;">Continue with Google</a>
+            </td>
+          </tr>
+          <tr><td style="padding:0 32px;"><div style="border-top:1px solid #eef2f7;"></div></td></tr>
+          <tr>
+            <td style="padding:20px 32px 32px 32px;">
+              <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
+                If you didn't request a password reset, you can safely ignore this email — nothing about your account has changed.
+              </p>
+            </td>
+          </tr>`;
+
+  return renderEmailLayout({
+    title: 'Use Google to sign in to CollabDocs',
+    preheader: 'Your CollabDocs account uses Google Sign-In — no password reset is needed.',
+    content,
+  });
+}
+
+// Sent when a password reset is requested for a Google-only account. We reply
+// over email (a channel only the real owner can read) instead of telling the
+// browser the account is OAuth-linked, so the reset endpoint stays free of any
+// account-enumeration signal.
+export async function sendOAuthResetNoticeEmail(to: string, displayName?: string): Promise<void> {
+  const greetingName = displayName?.trim() || to.split('@')[0];
+  const loginUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/login`;
+
+  try {
+    await dispatchEmail({
+      to,
+      subject: 'Sign in to CollabDocs with Google',
+      text:
+        `Hello ${greetingName},\n\n` +
+        `We received a request to reset the password for your CollabDocs account. ` +
+        `This account was created with Google Sign-In, so there's no password to reset — ` +
+        `just continue with Google to sign in:\n\n${loginUrl}\n\n` +
+        `If you didn't request this, you can safely ignore this email.`,
+      html: renderOAuthResetNoticeHtml(loginUrl, greetingName),
+      devLog: { loginUrl, reason: 'oauth-account-reset-notice' },
+    });
+  } catch (err) {
+    logger.error({ to, err: (err as Error).message }, '[mailer] FAILED to send OAuth reset notice');
+    throw err;
+  }
+}
+
 export async function sendPasswordResetOtpEmail(to: string, otp: string, displayName?: string): Promise<void> {
   const greetingName = displayName?.trim() || to.split('@')[0];
 

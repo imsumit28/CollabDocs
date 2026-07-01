@@ -19,17 +19,19 @@ test.describe('Forgot password (OTP)', () => {
     await expect(page.getByRole('group', { name: /verification code/i })).toBeVisible();
   });
 
-  test('steers Google accounts to Continue with Google', async ({ page }) => {
+  test('shows the same code-entry step for a Google account (no inline disclosure)', async ({ page }) => {
     await mockLoggedOut(page);
+    // The server responds identically for every email; Google-only accounts are
+    // notified by email, so the UI must not branch to a "use Google" screen.
     await page.route('**/auth/forgot-password', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 'OAUTH_ACCOUNT' }) }),
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ message: 'ok' }) }),
     );
 
     await page.goto('/forgot-password');
     await page.getByPlaceholder('you@example.com').fill('google@example.com');
     await page.getByRole('button', { name: /send otp/i }).click();
 
-    await expect(page.getByRole('heading', { name: /use google to sign in/i })).toBeVisible();
-    await expect(page.getByText(/created using google sign-in/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /enter the code/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /use google to sign in/i })).toHaveCount(0);
   });
 });

@@ -16,7 +16,7 @@ import {
 } from '../utils/jwt';
 import { signupRateLimit, authRateLimit, resendVerificationRateLimit, forgotPasswordRateLimit, verifyOtpRateLimit, resendOtpRateLimit, resetPasswordRateLimit } from '../middleware/rateLimit';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { sendVerificationEmail, sendPasswordResetOtpEmail } from '../utils/mailer';
+import { sendVerificationEmail, sendPasswordResetOtpEmail, sendOAuthResetNoticeEmail } from '../utils/mailer';
 import { validateEmail, validatePassword, validateOtp, validateDisplayName, validateAvatarUrl, firstError } from '../utils/validation';
 
 const envCandidates = [
@@ -402,32 +402,36 @@ router.post('/resend-verification', resendVerificationRateLimit, authMiddleware,
 // protected by a per-user attempt counter plus IP rate limits.
 
 // Issues (or re-issues) an OTP for a manual account. Shared by /forgot-password
-// and /resend-otp. Returns a response code the caller maps to a status/body.
-async function issuePasswordResetOtp(email: unknown): Promise<
-  | { code: 'OK' }
-  | { code: 'OAUTH_ACCOUNT' }
-  | { code: 'COOLDOWN'; retryAfterSec: number }
-> {
-  if (!email || typeof email !== 'string') return { code: 'OK' };
+// and /resend-otp. Callers always return the same generic response regardless of
+// outcome, so the endpoints leak nothing about which emails are registered.
+async function issuePasswordResetOtp(email: unknown): Promise<void> {
+  if (!email || typeof email !== 'string') return;
 
   const user = await User.findOne({ email: email.toLowerCase() });
 
-  // Google-only accounts have no password to reset. We intentionally surface
-  // this so the UI can steer the user to "Continue with Google" (a deliberate
-  // UX choice that reveals account type for this case only).
+  // Google-only accounts have no password to reset. Rather than tell the browser
+  // the account is OAuth-linked (which would confirm it exists and reveal its
+  // type), we notify the real owner over email — a channel only they can read —
+  // and let the caller respond with the same generic message as every other case.
   if (user && !user.passwordHash && user.oauthProvider) {
-    return { code: 'OAUTH_ACCOUNT' };
+    sendOAuthResetNoticeEmail(user.email, user.displayName).catch(() => {});
+    return;
   }
 
   // Unknown email or a non-OAuth account without a password: respond as success
   // without sending anything, so we don't leak which emails are registered.
-  if (!user || !user.passwordHash) return { code: 'OK' };
+  if (!user || !user.passwordHash) return;
 
-  // Throttle resends per account, independent of IP rate limiting.
+  // Throttle resends per account, independent of IP rate limiting. We enforce
+  // this *silently* — if we're still inside the cooldown window we skip sending
+  // a new code but return the same generic OK. Surfacing a distinct 429 here
+  // would be an enumeration oracle: a second rapid request would 429 for a real
+  // account (which has a recent OTP) but 200 for an unknown email (which never
+  // gets here), letting an attacker confirm which addresses are registered.
   if (user.passwordResetOtpSentAt) {
     const elapsed = Date.now() - user.passwordResetOtpSentAt.getTime();
     if (elapsed < OTP_RESEND_COOLDOWN_MS) {
-      return { code: 'COOLDOWN', retryAfterSec: Math.ceil((OTP_RESEND_COOLDOWN_MS - elapsed) / 1000) };
+      return;
     }
   }
 
@@ -442,27 +446,13 @@ async function issuePasswordResetOtp(email: unknown): Promise<
   await user.save();
 
   sendPasswordResetOtpEmail(user.email, otp, user.displayName).catch(() => {});
-  return { code: 'OK' };
 }
 
 const GENERIC_OTP_MESSAGE = 'If an account exists for that email, a verification code has been sent.';
 
 router.post('/forgot-password', forgotPasswordRateLimit, async (req: Request, res: Response) => {
   try {
-    const result = await issuePasswordResetOtp(req.body?.email);
-    if (result.code === 'OAUTH_ACCOUNT') {
-      res.status(200).json({
-        code: 'OAUTH_ACCOUNT',
-        message:
-          'This account was created using Google Sign-In. Please continue using "Continue with Google". ' +
-          'Password reset is only available for accounts registered with email and password.',
-      });
-      return;
-    }
-    if (result.code === 'COOLDOWN') {
-      res.status(429).json({ error: `Please wait ${result.retryAfterSec}s before requesting another code.`, retryAfterSec: result.retryAfterSec });
-      return;
-    }
+    await issuePasswordResetOtp(req.body?.email);
     res.json({ message: GENERIC_OTP_MESSAGE });
   } catch {
     res.status(500).json({ error: 'Could not process password reset request' });
@@ -472,15 +462,7 @@ router.post('/forgot-password', forgotPasswordRateLimit, async (req: Request, re
 // Resend uses a slightly more permissive limiter; logic is otherwise identical.
 router.post('/resend-otp', resendOtpRateLimit, async (req: Request, res: Response) => {
   try {
-    const result = await issuePasswordResetOtp(req.body?.email);
-    if (result.code === 'OAUTH_ACCOUNT') {
-      res.status(200).json({ code: 'OAUTH_ACCOUNT' });
-      return;
-    }
-    if (result.code === 'COOLDOWN') {
-      res.status(429).json({ error: `Please wait ${result.retryAfterSec}s before requesting another code.`, retryAfterSec: result.retryAfterSec });
-      return;
-    }
+    await issuePasswordResetOtp(req.body?.email);
     res.json({ message: GENERIC_OTP_MESSAGE });
   } catch {
     res.status(500).json({ error: 'Could not resend verification code' });

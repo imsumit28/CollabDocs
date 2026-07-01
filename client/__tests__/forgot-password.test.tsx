@@ -29,14 +29,17 @@ describe('ForgotPasswordPage', () => {
     expect(screen.getByRole('group', { name: /verification code/i })).toBeInTheDocument();
   });
 
-  it('shows the Google-account screen when the API reports an OAuth account', async () => {
-    mockedPost.mockResolvedValue({ data: { code: 'OAUTH_ACCOUNT' } });
+  it('advances to the code-entry step for every email, revealing nothing about the account', async () => {
+    // The server no longer distinguishes account types in its response (Google
+    // accounts are notified over email), so the UI shows the same OTP step for
+    // any input — there is no Google-account branch to reach.
+    mockedPost.mockResolvedValue({ data: { message: 'sent' } });
     render(<ForgotPasswordPage />);
 
     await submitEmail('google@example.com');
 
-    expect(await screen.findByRole('heading', { name: /use google to sign in/i })).toBeInTheDocument();
-    expect(screen.getByText(/created using google sign-in/i)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /enter the code/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /use google to sign in/i })).not.toBeInTheDocument();
   });
 
   it('surfaces a server error message', async () => {
