@@ -27,6 +27,16 @@ async function buildCollaboratorList(doc: IDocument) {
 const router = Router();
 router.use(authMiddleware);
 
+// Reject a malformed :id up front. Without this, passing a non-ObjectId string
+// to CollabDocument.findById() throws a Mongoose CastError inside an async
+// handler — which Express 4 cannot route to the error middleware, so the request
+// hangs (and an unhandled rejection can crash the process). Returns 400, matching
+// the id guards already used by the comments/folders/notifications routers.
+router.param('id', (req, res, next, val) => {
+  if (!isValidObjectId(val)) { res.status(400).json({ error: 'Invalid id' }); return; }
+  next();
+});
+
 const TRASH_TTL_DAYS = 7;
 const TRASH_TTL_MS   = TRASH_TTL_DAYS * 24 * 60 * 60 * 1000;
 

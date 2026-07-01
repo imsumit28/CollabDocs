@@ -3,9 +3,22 @@ import { Version, CollabDocument } from '../models';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { getDocRoom } from '../socket/index';
 import { plainTextFromState } from '../utils/yjsText';
+import { isValidObjectId } from '../utils/validation';
 
 const router = Router();
 router.use(authMiddleware);
+
+// Guard the id params so a malformed value doesn't throw an unhandled Mongoose
+// CastError in these async handlers (Express 4 can't forward that to the error
+// middleware, so the request would otherwise hang).
+router.param('docId', (req, res, next, val) => {
+  if (!isValidObjectId(val)) { res.status(400).json({ error: 'Invalid document id' }); return; }
+  next();
+});
+router.param('id', (req, res, next, val) => {
+  if (!isValidObjectId(val)) { res.status(400).json({ error: 'Invalid version id' }); return; }
+  next();
+});
 
 // ─── List versions for a document ─────────────────────────────────────────────
 router.get('/:docId', async (req: AuthRequest, res: Response) => {
