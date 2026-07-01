@@ -4,10 +4,16 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '../../lib/api';
 
-type Step = 'email' | 'oauth' | 'otp' | 'reset' | 'done';
+type Step = 'email' | 'otp' | 'reset' | 'done';
 
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN = 60; // seconds — matches the server-side resend throttle
+
+// Basic RFC-5322-ish check: non-empty local part, single @, a dotted domain.
+// Kept deliberately lenient — the server is the source of truth, this just
+// gates the button and drives the inline hint.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const isValidEmail = (value: string) => EMAIL_RE.test(value.trim());
 
 // Password rules — kept in sync with the server's validatePassword config.
 const PASSWORD_RULES = [
@@ -158,6 +164,7 @@ export default function ForgotPasswordPage() {
     return () => clearInterval(id);
   }, [cooldown]);
 
+  const emailValid = isValidEmail(email);
   const passwordValid = PASSWORD_RULES.every((r) => r.test(password));
   const satisfiedRules = PASSWORD_RULES.filter((r) => r.test(password)).length;
 
@@ -167,11 +174,11 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await api.post('/auth/forgot-password', { email });
-      if (res.data?.code === 'OAUTH_ACCOUNT') {
-        setStep('oauth');
-        return;
-      }
+      // The server always returns the same generic response — it never reveals
+      // whether the email is registered or is a Google-only account (those users
+      // are notified over email instead). So we advance to the OTP step for every
+      // input, leaking nothing about which addresses exist.
+      await api.post('/auth/forgot-password', { email });
       setStep('otp');
       setOtp('');
       setCooldown(RESEND_COOLDOWN);
@@ -285,10 +292,16 @@ export default function ForgotPasswordPage() {
                   required
                   autoComplete="email"
                   placeholder="you@example.com"
-                  className={inputClass}
+                  aria-invalid={email.length > 0 && !emailValid ? 'true' : 'false'}
+                  className={`${inputClass} ${
+                    email.length > 0 && !emailValid ? 'border-red-300 focus:border-red-400 focus:ring-red-500/[0.08]' : ''
+                  }`}
                 />
+                {email.length > 0 && !emailValid && (
+                  <p className="mt-1.5 text-[12.5px] font-medium text-red-500">Enter a valid email address</p>
+                )}
               </div>
-              <button type="submit" disabled={loading || !email} className={primaryBtn}>
+              <button type="submit" disabled={loading || !emailValid} className={primaryBtn}>
                 {loading ? <><Spinner /> Sending…</> : 'Send OTP'}
               </button>
             </form>
@@ -298,39 +311,6 @@ export default function ForgotPasswordPage() {
               <Link href="/login" className="font-semibold text-[#3B82F6] hover:text-[#2563EB] transition-colors">Sign in</Link>
             </p>
           </>
-        )}
-
-        {/* ── STEP: Google account ── */}
-        {step === 'oauth' && (
-          <div className="text-center">
-            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50">
-              <svg className="h-7 w-7" viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-              </svg>
-            </div>
-            <h1 className="text-[26px] font-extrabold text-[#0F172A] tracking-[-0.03em]">Use Google to sign in</h1>
-            <p className="mt-3 text-[15px] text-[#64748B] leading-relaxed">
-              This account was created using Google Sign-In. Password reset is only available for accounts registered with email and password.
-            </p>
-            <a
-              href={`${process.env.NEXT_PUBLIC_API_URL}/api/auth/google`}
-              className="mt-7 flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-[#E2E8F0] bg-white text-[14px] font-semibold text-[#0F172A] shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:border-[#CBD5E1] transition-all duration-200"
-            >
-              <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-              </svg>
-              Continue with Google
-            </a>
-            <button type="button" onClick={backToEmail} className="mt-5 text-[14px] font-semibold text-[#64748B] hover:text-[#0F172A] transition-colors">
-              Use a different email
-            </button>
-          </div>
         )}
 
         {/* ── STEP: enter OTP ── */}
