@@ -1,21 +1,15 @@
 import nodemailer from 'nodemailer';
-import fs from 'fs';
-import path from 'path';
 import { logger } from './logger';
 
-// Brand logo embedded inline (via CID) in transactional emails. Inlining means
-// the image travels with the message, so it renders in every client without
-// depending on a public asset URL. Resolved once at module load.
-const LOGO_PATH = [
-  path.resolve(process.cwd(), 'client/public/collabdocs-logo-full.png'),
-  path.resolve(process.cwd(), '../client/public/collabdocs-logo-full.png'),
-].find((candidate) => fs.existsSync(candidate));
-const LOGO_CID = 'collabdocs-logo';
-
-function logoAttachment() {
-  if (!LOGO_PATH) return [];
-  return [{ filename: 'collabdocs-logo.png', path: LOGO_PATH, cid: LOGO_CID }];
-}
+// Public URL of the brand logo shown in email headers. Email clients can't load
+// localhost, so this renders only in deployed environments (where CLIENT_URL is
+// a real https origin). When unavailable, the layout falls back to a styled
+// text wordmark so the email never shows a broken image.
+const LOGO_URL =
+  process.env.EMAIL_LOGO_URL ||
+  (process.env.CLIENT_URL && /^https:\/\//.test(process.env.CLIENT_URL)
+    ? `${process.env.CLIENT_URL}/collabdocs-logo-full.png`
+    : '');
 
 function createTransport() {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
@@ -28,26 +22,87 @@ function createTransport() {
   });
 }
 
-export async function sendVerificationEmail(to: string, rawToken: string): Promise<void> {
-  const apiUrl = process.env.API_URL || 'http://localhost:4000';
-  const verifyUrl = `${apiUrl}/api/auth/verify-email/${rawToken}`;
-  const from = process.env.SMTP_FROM || 'CollabDocs <noreply@collabdocs.app>';
-  const greetingName = to.split('@')[0];
+// Split a "Name <email>" string into Brevo's sender shape.
+function parseSender(from: string): { name: string; email: string } {
+  const match = from.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+  if (match) return { name: match[1] || 'CollabDocs', email: match[2] };
+  return { name: 'CollabDocs', email: from.trim() };
+}
 
-  const transport = createTransport();
-  if (!transport) {
-    logger.info({ to, verifyUrl }, '[mailer] SMTP not configured — verification URL (dev fallback)');
+interface OutgoingEmail {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  // Extra fields logged only when no transport is configured (local dev), e.g.
+  // the OTP or verification URL, so the flow is still testable without email.
+  devLog?: Record<string, unknown>;
+}
+
+// Send an email via the best available transport:
+//   1. Brevo HTTP API  — used when BREVO_API_KEY is set. Sends over HTTPS, so it
+//      works on hosts that block outbound SMTP ports (e.g. Render).
+//   2. SMTP (nodemailer) — used in local dev when SMTP_* is configured.
+//   3. Console fallback  — neither configured: log the payload instead of sending.
+async function dispatchEmail(opts: OutgoingEmail): Promise<void> {
+  const from = process.env.SMTP_FROM || 'CollabDocs <noreply@collabdocs.app>';
+  const brevoKey = process.env.BREVO_API_KEY;
+
+  if (brevoKey) {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': brevoKey, 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({
+        sender: parseSender(from),
+        to: [{ email: opts.to }],
+        subject: opts.subject,
+        htmlContent: opts.html,
+        textContent: opts.text,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`Brevo API responded ${res.status}: ${body}`);
+    }
+    logger.info({ to: opts.to, via: 'brevo-api' }, '[mailer] email sent');
     return;
   }
 
-  await transport.sendMail({
+  const transport = createTransport();
+  if (!transport) {
+    logger.info(
+      { to: opts.to, ...opts.devLog },
+      '[mailer] no email transport configured — dev fallback (logged, not sent)'
+    );
+    return;
+  }
+  const info = await transport.sendMail({
     from,
-    to,
-    subject: 'Verify your CollabDocs email',
-    text: `Hello ${greetingName},\n\nClick the link below to verify your email address (expires in 24 hours):\n\n${verifyUrl}\n\nIf you didn't create a CollabDocs account, you can ignore this email.`,
-    html: renderVerificationHtml(verifyUrl, greetingName),
-    attachments: logoAttachment(),
+    to: opts.to,
+    subject: opts.subject,
+    html: opts.html,
+    text: opts.text,
   });
+  logger.info({ to: opts.to, via: 'smtp', messageId: info.messageId }, '[mailer] email sent');
+}
+
+export async function sendVerificationEmail(to: string, rawToken: string): Promise<void> {
+  const apiUrl = process.env.API_URL || 'http://localhost:4000';
+  const verifyUrl = `${apiUrl}/api/auth/verify-email/${rawToken}`;
+  const greetingName = to.split('@')[0];
+
+  try {
+    await dispatchEmail({
+      to,
+      subject: 'Verify your CollabDocs email',
+      text: `Hello ${greetingName},\n\nClick the link below to verify your email address (expires in 24 hours):\n\n${verifyUrl}\n\nIf you didn't create a CollabDocs account, you can ignore this email.`,
+      html: renderVerificationHtml(verifyUrl, greetingName),
+      devLog: { verifyUrl },
+    });
+  } catch (err) {
+    logger.error({ to, err: (err as Error).message }, '[mailer] FAILED to send verification email');
+    throw err;
+  }
 }
 
 // Shared, table-based, inline-styled email shell for broad client compatibility
@@ -57,8 +112,8 @@ export async function sendVerificationEmail(to: string, rawToken: string): Promi
 // `content` — the inner <tr> rows — differs per email.
 function renderEmailLayout(opts: { title: string; preheader: string; content: string }): string {
   const year = new Date().getFullYear();
-  const header = LOGO_PATH
-    ? `<img src="cid:${LOGO_CID}" alt="CollabDocs" height="32" style="height:32px;width:auto;display:block;border:0;outline:none;text-decoration:none;" />`
+  const header = LOGO_URL
+    ? `<img src="${LOGO_URL}" alt="CollabDocs" height="32" style="height:32px;width:auto;display:block;border:0;outline:none;text-decoration:none;" />`
     : `<table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:middle;">
@@ -185,26 +240,24 @@ function renderVerificationHtml(verifyUrl: string, greetingName: string): string
 }
 
 export async function sendPasswordResetOtpEmail(to: string, otp: string, displayName?: string): Promise<void> {
-  const from = process.env.SMTP_FROM || 'CollabDocs <noreply@collabdocs.app>';
   const greetingName = displayName?.trim() || to.split('@')[0];
 
-  const transport = createTransport();
-  if (!transport) {
-    // Dev fallback: SMTP not configured, so log the code instead of sending.
-    logger.info({ to, otp }, '[mailer] SMTP not configured — password reset OTP (dev fallback)');
-    return;
+  try {
+    await dispatchEmail({
+      to,
+      subject: 'Password Reset OTP',
+      text:
+        `Hello ${greetingName},\n\n` +
+        `Your password reset verification code is:\n\n${otp}\n\n` +
+        `This OTP is valid for 10 minutes.\n\n` +
+        `If you didn't request this, please ignore this email.`,
+      html: renderOtpHtml(otp, greetingName),
+      devLog: { otp },
+    });
+  } catch (err) {
+    // Surface the real failure in logs — callers fire-and-forget, so without
+    // this a failed send is invisible (the user still sees "code sent").
+    logger.error({ to, err: (err as Error).message }, '[mailer] FAILED to send password reset OTP');
+    throw err;
   }
-
-  await transport.sendMail({
-    from,
-    to,
-    subject: 'Password Reset OTP',
-    text:
-      `Hello ${greetingName},\n\n` +
-      `Your password reset verification code is:\n\n${otp}\n\n` +
-      `This OTP is valid for 10 minutes.\n\n` +
-      `If you didn't request this, please ignore this email.`,
-    html: renderOtpHtml(otp, greetingName),
-    attachments: logoAttachment(),
-  });
 }
