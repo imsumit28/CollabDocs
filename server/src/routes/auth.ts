@@ -14,7 +14,7 @@ import {
   setRefreshCookie,
   clearRefreshCookie,
 } from '../utils/jwt';
-import { signupRateLimit, authRateLimit, resendVerificationRateLimit, forgotPasswordRateLimit, verifyOtpRateLimit, resendOtpRateLimit } from '../middleware/rateLimit';
+import { signupRateLimit, authRateLimit, resendVerificationRateLimit, forgotPasswordRateLimit, verifyOtpRateLimit, resendOtpRateLimit, resetPasswordRateLimit } from '../middleware/rateLimit';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { sendVerificationEmail, sendPasswordResetOtpEmail } from '../utils/mailer';
 import { validateEmail, validatePassword, validateOtp, validateDisplayName, validateAvatarUrl, firstError } from '../utils/validation';
@@ -546,7 +546,7 @@ router.post('/verify-otp', verifyOtpRateLimit, async (req: Request, res: Respons
 });
 
 // Complete the reset using the ticket from /verify-otp.
-router.post('/reset-password', async (req: Request, res: Response) => {
+router.post('/reset-password', resetPasswordRateLimit, async (req: Request, res: Response) => {
   try {
     const { token, password } = req.body;
     if (!token || typeof token !== 'string') {

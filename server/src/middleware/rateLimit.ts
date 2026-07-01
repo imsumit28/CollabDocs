@@ -65,6 +65,18 @@ export const resendOtpRateLimit = rateLimit({
   skip: skipInTest,
 });
 
+// Completing the reset with the post-OTP ticket. The ticket is a single-use,
+// unguessable 32-byte token, so this is defense-in-depth against ticket
+// brute-forcing / abuse rather than the primary guard.
+export const resetPasswordRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: { error: 'Too many password reset attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipInTest,
+});
+
 export const aiRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 20,
