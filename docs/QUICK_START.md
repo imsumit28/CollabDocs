@@ -25,7 +25,7 @@ npm run dev
 
 # Frontend: http://localhost:3000
 # Backend: http://localhost:4000
-# API Docs: http://localhost:4000/api/docs
+# API Docs: http://localhost:4000/api/swagger
 ```
 
 ---
@@ -73,7 +73,7 @@ npm run test:watch --workspace=server
 ### Interactive Swagger UI
 ```bash
 npm run dev --workspace=server
-# Open http://localhost:4000/api/docs
+# Open http://localhost:4000/api/swagger
 ```
 
 ### Key Endpoints
@@ -84,9 +84,9 @@ npm run dev --workspace=server
 - `GET /api/auth/me` — Get current user
 
 **Documents:**
-- `GET /api/documents` — List your documents
-- `POST /api/documents` — Create document
-- `POST /api/documents/:id/share` — Share with link
+- `GET /api/docs` — List your documents
+- `POST /api/docs` — Create document
+- `POST /api/docs/:id/share` — Share with link
 
 **Comments:**
 - `POST /api/comments` — Add comment
@@ -238,7 +238,7 @@ See [README.md](../README.md) for detailed deployment steps.
 
 ### API
 - [Complete API Reference](API.md)
-- [Swagger UI](http://localhost:4000/api/docs) (when running)
+- [Swagger UI](http://localhost:4000/api/swagger) (when running)
 - [Error Handling](API.md#error-response-format)
 
 ---
@@ -283,7 +283,7 @@ npm run test:watch -- --verbose
 ## Next Steps
 
 1. **Run locally**: `npm install && npm run dev`
-2. **Explore API docs**: Open http://localhost:4000/api/docs
+2. **Explore API docs**: Open http://localhost:4000/api/swagger
 3. **Run tests**: `npm run test --workspace=server`
 4. **Read CONTRIBUTING.md**: Understand dev workflow
 5. **Deploy**: Follow deployment section in [README.md](../README.md)
@@ -293,7 +293,7 @@ npm run test:watch -- --verbose
 ## Need Help?
 
 - **Setup issues?** See CONTRIBUTING.md → Development Setup
-- **API questions?** See API.md or http://localhost:4000/api/docs
+- **API questions?** See API.md or http://localhost:4000/api/swagger
 - **Security concerns?** See SECURITY.md
 - **Contributing?** See CONTRIBUTING.md
 - **Bug report?** Use .github/ISSUE_TEMPLATE/bug_report.md

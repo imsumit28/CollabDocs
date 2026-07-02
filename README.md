@@ -16,7 +16,7 @@
 
 Multiple users edit the same document simultaneously with live cursors, conflict-free CRDT sync, AI writing assistance, and version history.
 
-**[Live Demo](https://collabdocs2026.vercel.app)** · **[API Docs](https://collabdocs2026.vercel.app/api/docs)** · **[GitHub](https://github.com/imsumit28/CollabDocs)**
+**[Live Demo](https://collabdocs2026.vercel.app)** · **[API Docs](https://collabdocs2026.vercel.app/api/swagger)** · **[GitHub](https://github.com/imsumit28/CollabDocs)**
 
 </div>
 
@@ -56,9 +56,9 @@ Multiple users edit the same document simultaneously with live cursors, conflict
 - **Account settings** — Update profile (name, username, avatar) and change password from a dedicated settings page.
 
 ### Production-Ready
-- **173 server tests** — Auth, documents, folders, comments, versions, search, notifications, and real-time sync covered at ~70% overall, plus client component tests (Jest + React Testing Library) and browser E2E (Playwright).
+- **325 server tests** — Auth, documents, folders, comments, versions, search, notifications, and real-time sync covered at ~88% overall, plus client component tests (Jest + React Testing Library) and browser E2E (Playwright).
 - **Structured logging** — Leveled JSON logs via pino (pretty-printed in dev), with HTTP request logging and secret redaction.
-- **Interactive API docs** — Swagger/OpenAPI UI at `/api/docs` with request examples.
+- **Interactive API docs** — Swagger/OpenAPI UI at `/api/swagger` with request examples.
 - **Security-first** — Rate limiting, input validation, CORS, Helmet headers, XSS/CSRF protection.
 - **Full TypeScript** — End-to-end type safety across client and server.
 
@@ -165,7 +165,7 @@ cp client/.env.example client/.env.local    # both vars point at the backend
 npm run dev
 # Frontend → http://localhost:3000
 # Backend  → http://localhost:4000
-# API Docs → http://localhost:4000/api/docs
+# API Docs → http://localhost:4000/api/swagger
 ```
 
 **Full setup walkthrough, env variable reference → [docs/QUICK_START.md](docs/QUICK_START.md)**
@@ -204,7 +204,7 @@ npm run dev --workspace=server   # Backend only
 
 ## Testing
 
-**173 server tests** (~70% coverage) against an in-memory MongoDB — no local DB or paid cluster needed, runs offline and in CI. Plus client component tests (Jest + React Testing Library) and browser E2E (Playwright with mocked routes).
+**325 server tests** (~88% coverage) against an in-memory MongoDB — no local DB or paid cluster needed, runs offline and in CI. Plus client component tests (Jest + React Testing Library) and 8 browser E2E specs (Playwright with mocked routes).
 
 ```bash
 npm run test --workspace=server      # Server suite + coverage
@@ -218,14 +218,14 @@ npm run test:e2e --workspace=client  # Playwright E2E (auto-starts the app)
 
 ## API
 
-Interactive Swagger UI at `http://localhost:4000/api/docs` when the server is running. Highlights:
+Interactive Swagger UI at `http://localhost:4000/api/swagger` when the server is running. Highlights:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/api/auth/login` | Login — access token + `HttpOnly` refresh cookie |
-| `GET` | `/api/documents` | List owned + shared documents (optional pagination) |
-| `GET` | `/api/documents/search?q=` | Search docs by title **and** content |
-| `POST` | `/api/documents/:id/share` | Generate a share link (View / Edit) |
+| `GET` | `/api/docs` | List owned + shared documents (optional pagination) |
+| `GET` | `/api/docs/search?q=` | Search docs by title **and** content |
+| `POST` | `/api/docs/:id/share` | Generate a share link (View / Edit) |
 | `POST` | `/api/ai/{improve,summarize,translate,...}` | AI writing actions (`?stream=1` to stream) |
 | `POST` | `/api/export/:id/{pdf,docx}` | Export a document |
 

@@ -16,7 +16,8 @@
   - Refresh token handling
   - Logout invalidation
   - Protected endpoint access (`GET /me`)
-  - **Coverage: ~12 test cases, ~75% route coverage**
+  - Email verify/resend, OTP password-reset flow (`auth-extra.test.ts`)
+  - **Coverage: ~83% route coverage**
 
 - **`src/__tests__/routes/documents.test.ts`** (270+ lines)
   - Create documents with defaults
@@ -25,21 +26,23 @@
   - Update document title with permissions
   - Soft delete and trash management
   - Share links (create, disable, permissions)
-  - **Coverage: ~15 test cases, ~72% route coverage**
+  - Restore/permanent-delete, folders, malformed-id guard (`documents-extra.test.ts`)
+  - **Coverage: ~86% route coverage**
 
 - **`src/__tests__/routes/comments.test.ts`** (210+ lines)
   - Create, list, reply to comments
   - Resolve/reopen comments
   - Delete comment (author only)
-  - **Coverage: ~10 test cases, ~65% route coverage**
+  - Failure paths: malformed ids, missing fields, viewer-not-author resolve (`comments-extra.test.ts`)
+  - **Coverage: ~96% route coverage**
 
-- **`src/__tests__/socket/sync.test.ts`** (180+ lines)
-  - JWT auth on WebSocket connections
-  - Y.js CRDT delta application
-  - Concurrent edit resolution
-  - Relative cursor positioning
-  - Offline changes and merge
-  - **Coverage: ~8 test cases, ~45% socket coverage**
+- **`src/__tests__/socket/socketHandlers.test.ts`** (real Socket.IO integration)
+  - Handshake JWT auth (valid / missing / invalid token)
+  - `doc:join` authorization (owner / editor / viewer / stranger / share token)
+  - `yjs:update` write-gate — view-only participants cannot write or persist
+  - Presence dedupe + cursor / typing / awareness relays
+  - Debounced auto-save and persistence-on-leave
+  - **Coverage: ~19 test cases, ~87% socket coverage**
 
 - **`src/__tests__/api-docs.test.ts`** (50+ lines)
   - Swagger spec validation tests

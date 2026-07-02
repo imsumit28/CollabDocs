@@ -5,6 +5,18 @@ All notable changes to CollabDocs will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+- **Vestigial `GET /api/docs/shared/:token` route.** It was unused — the client resolves shared documents over the WebSocket `doc:join` (with the share token) and loads metadata via `GET /api/docs/:id` — and its "no auth needed" comment was inaccurate (the route sat behind the auth middleware).
+
+### Fixed
+- **Malformed document/version id no longer hangs the request (DoS).** A non-ObjectId `:id`/`:docId` on the documents and versions routes threw a Mongoose `CastError` inside an async handler, which Express 4 cannot route to the error middleware — leaving the request hung (and, on Node 15+, an unhandled rejection can crash the process). These routers now validate the id up front and return `400`, matching the comments/folders/notifications routers.
+- **Malformed JSON request bodies now return `400` instead of `500`.** The global error handler passes client-error (4xx) statuses through instead of masking every error as an internal server error.
+
+### Tests
+- Server suite expanded to **325 tests (~88% coverage)** — added real Socket.IO integration tests (join authorization, the view-only write-gate, presence, cursor/typing relays, debounced save), utility tests (validation, jwt, mailer), route failure-path tests, and security/robustness tests (IDOR, malformed input, rate-limit triggering). Client E2E grew to 8 specs (added an authenticated dashboard journey). Removed the placeholder `socket/sync.test.ts`.
+
 ## [2.0.0] - 2026-06-28
 
 A large reliability, security, and feature release. Several APIs changed in
@@ -15,7 +27,7 @@ backward-incompatible ways (see **Changed / Breaking**), so this is a major bump
 #### Document organization & discovery
 - **Folders** — Organize documents into folders from the dashboard sidebar (create / rename / delete, with live per-folder document counts). Move docs in/out from the card menu; deleting a folder keeps its documents (they return to root).
 - **Server-side search** — Full-text search across your documents by **title and content** (a plain-text mirror is kept in sync on every save). Includes a one-off backfill script (`npm run backfill:search`) to index documents created before this feature.
-- **List pagination** — `GET /api/documents` supports an optional `?page=&limit=` envelope; the dashboard renders documents incrementally with a "Load more" control.
+- **List pagination** — `GET /api/docs` supports an optional `?page=&limit=` envelope; the dashboard renders documents incrementally with a "Load more" control.
 
 #### Collaboration
 - **Invite collaborators by email** — Add people by email with View/Edit permission, manage them in a "People with access" panel available from **both the editor and the dashboard** Share modal.
@@ -40,7 +52,7 @@ backward-incompatible ways (see **Changed / Breaking**), so this is a major bump
 - **Tests**: 173 server tests (~70% coverage) against an in-memory MongoDB, client component tests (Jest + React Testing Library), and browser E2E (Playwright, API-mocked — no backend/DB needed).
 
 ### Changed / Breaking
-- **Collaborator API is now email-based.** `POST /api/documents/:id/collaborators` takes `{ email, permission }` (and `DELETE …/collaborators/:userId`), replacing the previous userId-based endpoint.
+- **Collaborator API is now email-based.** `POST /api/docs/:id/collaborators` takes `{ email, permission }` (and `DELETE …/collaborators/:userId`), replacing the previous userId-based endpoint.
 - **Share-link socket access requires a token.** `doc:join` now verifies a share token for link-based access by non-collaborators, and view-only participants can no longer write.
 - **AI endpoints are per-action** (`/api/ai/{improve,grammar,summarize,…}`); the previous generic assist endpoint was removed.
 - **Logging migrated from `morgan` to `pino`** — log output format changed (the `morgan` dependency was removed).

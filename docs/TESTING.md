@@ -56,12 +56,14 @@ server/src/__tests__/
 
 **Target: 60%+ coverage on critical paths**
 
+Overall server coverage is **~88% statements / ~90% lines** across **325 tests** (24 suites).
+
 | Module | Current | Target | Coverage Includes |
 |--------|---------|--------|-------------------|
-| Auth routes | ~75% | 80% | signup, login, logout, refresh, JWT validation |
-| Document routes | ~72% | 75% | CRUD, sharing, permissions, trash |
-| Comment routes | ~65% | 70% | create, reply, resolve |
-| WebSocket | ~45% | 60% | sync, CRDT, offline merge |
+| Auth routes | ~83% | 80% | signup, login, logout, refresh, JWT validation, verify/resend, OTP reset |
+| Document routes | ~86% | 75% | CRUD, sharing, permissions, trash, folders, malformed-id guard |
+| Comment routes | ~96% | 70% | create, reply, resolve, delete, failure paths |
+| WebSocket | ~87% | 60% | join authz, write-gate, presence, cursor/typing relays, debounced save |
 
 ### Coverage threshold
 ```javascript
@@ -135,7 +137,7 @@ describe('Document access control', () => {
 
   it('owner should read document', async () => {
     const res = await request(app)
-      .get(`/api/documents/${doc._id}`)
+      .get(`/api/docs/${doc._id}`)
       .set('Authorization', `Bearer ${user1Token}`);
 
     expect(res.status).toBe(200);
@@ -144,7 +146,7 @@ describe('Document access control', () => {
 
   it('unauthorized user should be rejected', async () => {
     const res = await request(app)
-      .get(`/api/documents/${doc._id}`)
+      .get(`/api/docs/${doc._id}`)
       .set('Authorization', `Bearer ${user2Token}`);
 
     expect(res.status).toBe(403);

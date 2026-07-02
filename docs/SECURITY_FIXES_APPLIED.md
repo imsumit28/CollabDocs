@@ -73,6 +73,16 @@ SESSION_TIMEOUT_MINUTES=60
 REFRESH_TOKEN_EXPIRY_DAYS=7
 ```
 
+### 4. Async Route Error Handling — Malformed-`:id` DoS (2026-07-02)
+
+A malformed (non-ObjectId) `:id`/`:docId` on the **documents** and **versions** routes passed straight into `Model.findById(...)`, which throws a Mongoose `CastError`. Because these are `async` handlers with no id guard or `try/catch`, the rejection is **not** routed to Express 4's error middleware — the request hangs indefinitely (and on Node 15+ an unhandled rejection can crash the process). An authenticated user hitting `/api/docs/<garbage>` could therefore stall connections (DoS).
+
+**Fixed:**
+- Added `router.param('id' | 'docId', …)` ObjectId guards to `routes/documents.ts` and `routes/versions.ts` that return `400` before any DB call (matching the guards the comments/folders/notifications routers already had).
+- Hardened the global error handler in `index.ts` to pass client-error (4xx) statuses through, so malformed JSON bodies return `400` instead of being masked as `500`.
+
+Regression tests: `__tests__/routes/documents-extra.test.ts`, `__tests__/security.test.ts`, `__tests__/health.test.ts`.
+
 ---
 
 ## Vulnerabilities Status
@@ -96,6 +106,7 @@ REFRESH_TOKEN_EXPIRY_DAYS=7
 3. Input length validation - Implemented
 4. MongoDB ObjectId validation - Implemented
 5. Environment variable validation - Implemented
+6. Malformed-`:id` async CastError DoS (hung request) - Fixed 2026-07-02
 
 ### Recommendations for Deployment
 

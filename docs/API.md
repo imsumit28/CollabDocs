@@ -1,6 +1,6 @@
 # CollabDocs API Documentation
 
-Complete REST API reference for CollabDocs. Swagger/OpenAPI documentation is available at `GET /api/docs` when running the server.
+Complete REST API reference for CollabDocs. Swagger/OpenAPI documentation is available at `GET /api/swagger` when running the server.
 
 ## Authentication
 
@@ -208,7 +208,7 @@ Sets refresh token cookie on success.
 
 ## Document Routes
 
-### POST `/api/documents`
+### POST `/api/docs`
 
 Create a new document.
 
@@ -235,7 +235,7 @@ Create a new document.
 
 ---
 
-### GET `/api/documents`
+### GET `/api/docs`
 
 List all documents user has access to (owned or collaborated on).
 
@@ -263,7 +263,7 @@ Note: `yjsState` (binary CRDT state) is excluded from list responses for perform
 
 ---
 
-### GET `/api/documents/:id`
+### GET `/api/docs/:id`
 
 Get single document with full content.
 
@@ -289,7 +289,7 @@ Get single document with full content.
 
 ---
 
-### PATCH `/api/documents/:id`
+### PATCH `/api/docs/:id`
 
 Update document title.
 
@@ -313,7 +313,7 @@ Update document title.
 
 ---
 
-### DELETE `/api/documents/:id`
+### DELETE `/api/docs/:id`
 
 Soft delete document (move to trash). Only owner can delete.
 
@@ -330,7 +330,7 @@ Auto-purged after 7 days.
 
 ---
 
-### GET `/api/documents/trash`
+### GET `/api/docs/trash`
 
 List deleted documents (for current user, who is the owner).
 
@@ -349,7 +349,7 @@ List deleted documents (for current user, who is the owner).
 
 ---
 
-### PATCH `/api/documents/:id/restore`
+### PATCH `/api/docs/:id/restore`
 
 Restore document from trash.
 
@@ -365,7 +365,7 @@ Restore document from trash.
 
 ---
 
-### DELETE `/api/documents/:id/permanent`
+### DELETE `/api/docs/:id/permanent`
 
 Permanently delete document from trash (cannot be undone).
 
@@ -380,7 +380,7 @@ Permanently delete document from trash (cannot be undone).
 
 ---
 
-### POST `/api/documents/:id/share`
+### POST `/api/docs/:id/share`
 
 Create or update share link for document.
 
@@ -412,7 +412,7 @@ Create or update share link for document.
 
 ---
 
-### POST `/api/documents/:id/collaborators`
+### POST `/api/docs/:id/collaborators`
 
 Add or update collaborator permissions.
 
@@ -628,8 +628,8 @@ No authentication required. Use to verify server is running.
 
 For local development and testing, you can:
 
-1. **Get Swagger UI:** `http://localhost:4000/api/docs`
-2. **Download OpenAPI spec:** `http://localhost:4000/api/docs/swagger.json`
+1. **Get Swagger UI:** `http://localhost:4000/api/swagger`
+2. **Download OpenAPI spec:** `http://localhost:4000/api/swagger/swagger.json`
 3. **Use example curl commands:**
 
 ```bash
@@ -656,7 +656,7 @@ curl -X GET http://localhost:4000/api/auth/me \
   -H "Authorization: Bearer <accessToken>"
 
 # List documents
-curl -X GET http://localhost:4000/api/documents \
+curl -X GET http://localhost:4000/api/docs \
   -H "Authorization: Bearer <accessToken>"
 ```
 
