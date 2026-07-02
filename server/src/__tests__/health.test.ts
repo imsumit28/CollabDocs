@@ -16,6 +16,16 @@ describe('Health & lifecycle', () => {
     expect(res.body.error).toBe('Route not found');
   });
 
+  it('returns 400 (not 500) for a malformed JSON body', async () => {
+    // body-parser raises a 400 SyntaxError; the global error handler now passes
+    // client-error statuses through instead of masking them as 500.
+    const res = await request(app)
+      .post('/api/auth/login')
+      .set('Content-Type', 'application/json')
+      .send('{ not valid json ');
+    expect(res.status).toBe(400);
+  });
+
   it('flushAllRooms resolves cleanly when no document rooms are open', async () => {
     await expect(flushAllRooms()).resolves.toBeUndefined();
   });

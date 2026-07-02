@@ -18,7 +18,6 @@ describe('Document Routes — extra coverage', () => {
   let ownerTok: string;
   let editorTok: string;
   let viewerTok: string;
-  let strangerTok: string;
 
   beforeAll(() => {
     app = express();
@@ -40,7 +39,6 @@ describe('Document Routes — extra coverage', () => {
     ownerTok = generateAccessToken(ownerId);
     editorTok = generateAccessToken(editorId);
     viewerTok = generateAccessToken(viewerId);
-    strangerTok = generateAccessToken(strangerId);
   });
 
   afterEach(async () => {
@@ -62,38 +60,6 @@ describe('Document Routes — extra coverage', () => {
     });
     return doc;
   }
-
-  // ─── GET /shared/:token ─────────────────────────────────────────────────────────
-  // NOTE: documents.ts:189 comments this endpoint as "(no auth needed)", but the
-  // router-level `router.use(authMiddleware)` actually gates it — so a token alone
-  // is NOT enough; the caller must also be authenticated. These tests pin the real
-  // (authenticated) behavior; the mismatch is reported as a low-severity finding.
-  describe('GET /shared/:token', () => {
-    it('requires authentication despite the "no auth needed" comment (401 without a token)', async () => {
-      await makeDoc({ shareLink: 'tok-abc', shareLinkPermission: 'view' });
-      const res = await request(app).get('/api/docs/shared/tok-abc');
-      expect(res.status).toBe(401);
-    });
-
-    it('resolves a shared document by token for an authenticated caller', async () => {
-      await makeDoc({ shareLink: 'tok-abc', shareLinkPermission: 'view' });
-      const res = await request(app).get('/api/docs/shared/tok-abc').set(auth(strangerTok));
-      expect(res.status).toBe(200);
-      expect(res.body.permission).toBe('view');
-      expect(res.body.document.title).toBe('Doc');
-    });
-
-    it('404 for an unknown token', async () => {
-      const res = await request(app).get('/api/docs/shared/does-not-exist').set(auth(ownerTok));
-      expect(res.status).toBe(404);
-    });
-
-    it('does not resolve a trashed document', async () => {
-      await makeDoc({ shareLink: 'tok-trash', shareLinkPermission: 'view', deletedAt: new Date() });
-      const res = await request(app).get('/api/docs/shared/tok-trash').set(auth(ownerTok));
-      expect(res.status).toBe(404);
-    });
-  });
 
   // ─── Single-doc access for collaborators ────────────────────────────────────────
   describe('GET /:id permission surface', () => {

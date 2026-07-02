@@ -22,9 +22,13 @@ describe('security & robustness', () => {
     app.use(express.json());
     app.use(cookieParser());
     mount(app);
-    // Mirror the production global error handler.
+    // Mirror the production global error handler: pass 4xx through, else 500.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    app.use((_err: any, _req: any, res: any, _next: any) => res.status(500).json({ error: 'Internal server error' }));
+    app.use((err: any, _req: any, res: any, _next: any) => {
+      const status = err?.status ?? err?.statusCode;
+      if (status && status >= 400 && status < 500) { res.status(status).json({ error: err.message }); return; }
+      res.status(500).json({ error: 'Internal server error' });
+    });
     return app;
   }
 
@@ -114,17 +118,16 @@ describe('security & robustness', () => {
 
   // ─── Malformed JSON body ──────────────────────────────────────────────────────
   describe('malformed JSON', () => {
-    it('does not crash; returns an error status (currently 500 — ideally 400)', async () => {
+    it('returns 400 for a malformed JSON body (not a hang or 500)', async () => {
       const app = appWith((a) => a.use('/api/docs', documentRoutes));
       const res = await request(app)
         .post('/api/docs')
         .set(auth(tokA))
         .set('Content-Type', 'application/json')
         .send('{ this is not valid json ');
-      // FINDING (low): express.json throws a SyntaxError (status 400), but the
-      // global error handler always responds 500. A friendlier handler would
-      // pass through err.status. Either way the server does not hang or crash.
-      expect([400, 500]).toContain(res.status);
+      // body-parser raises a SyntaxError with status 400; the global error
+      // handler now passes that through instead of masking it as 500.
+      expect(res.status).toBe(400);
     });
   });
 
