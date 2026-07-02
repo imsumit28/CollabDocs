@@ -106,6 +106,20 @@ describe('Socket handlers (integration)', () => {
     });
   }
 
+  // Join a room and wait until it's actually ready to accept edits. The server
+  // emits `doc:permission` BEFORE the Y.Doc room is created (there's an async DB
+  // read in between) and `yjs:sync` AFTER — so a `yjs:update` sent right after
+  // `doc:permission` can be dropped (`if (!room) return`). Waiting for `yjs:sync`
+  // guarantees the room exists. Listeners are registered before emitting so the
+  // events can't be missed. Returns the `doc:permission` payload.
+  async function joinAndSync(socket: ClientSocket, docId: string, shareToken?: string) {
+    const permP = once<{ docId: string; permission: string }>(socket, 'doc:permission');
+    const syncP = once(socket, 'yjs:sync');
+    socket.emit('doc:join', shareToken ? { docId, shareToken } : { docId });
+    const [perm] = await Promise.all([permP, syncP]);
+    return perm;
+  }
+
   // Build a Y.js update (base64) that inserts `text` into the TipTap 'default'
   // XmlFragment, so plainTextFromDoc() will surface it in contentText.
   function makeUpdate(text: string): string {
@@ -233,10 +247,8 @@ describe('Socket handlers (integration)', () => {
       const editorC = connect(editorToken);
       await Promise.all([connected(ownerC), connected(editorC)]);
 
-      ownerC.emit('doc:join', { docId });
-      await once(ownerC, 'doc:permission');
-      editorC.emit('doc:join', { docId });
-      await once(editorC, 'doc:permission');
+      await joinAndSync(ownerC, docId);
+      await joinAndSync(editorC, docId);
 
       const relayed = once(ownerC, 'yjs:update');
       const update = makeUpdate('Hello from editor');
@@ -251,10 +263,8 @@ describe('Socket handlers (integration)', () => {
       const viewerC = connect(viewerToken);
       await Promise.all([connected(ownerC), connected(viewerC)]);
 
-      ownerC.emit('doc:join', { docId });
-      await once(ownerC, 'doc:permission');
-      viewerC.emit('doc:join', { docId });
-      await once(viewerC, 'doc:permission');
+      await joinAndSync(ownerC, docId);
+      await joinAndSync(viewerC, docId);
 
       let ownerGotUpdate = false;
       ownerC.on('yjs:update', () => { ownerGotUpdate = true; });
@@ -270,8 +280,7 @@ describe('Socket handlers (integration)', () => {
       const docId = await makeDoc();
       const editorC = connect(editorToken);
       await connected(editorC);
-      editorC.emit('doc:join', { docId });
-      await once(editorC, 'doc:permission');
+      await joinAndSync(editorC, docId);
       editorC.emit('yjs:update', { docId, update: makeUpdate('Persisted editor text') });
       await wait(100);
       editorC.emit('doc:leave', { docId });
@@ -282,8 +291,7 @@ describe('Socket handlers (integration)', () => {
       // Now a viewer joins the (now-clean) room and tries to write; it must be dropped.
       const viewerC = connect(viewerToken);
       await connected(viewerC);
-      viewerC.emit('doc:join', { docId });
-      await once(viewerC, 'doc:permission');
+      await joinAndSync(viewerC, docId);
       viewerC.emit('yjs:update', { docId, update: makeUpdate('VIEWER SHOULD NOT PERSIST') });
       await wait(100);
       viewerC.emit('doc:leave', { docId });
@@ -333,10 +341,8 @@ describe('Socket handlers (integration)', () => {
       const a = connect(ownerToken);
       const b = connect(editorToken);
       await Promise.all([connected(a), connected(b)]);
-      a.emit('doc:join', { docId });
-      await once(a, 'doc:permission');
-      b.emit('doc:join', { docId });
-      await once(b, 'doc:permission');
+      await joinAndSync(a, docId);
+      await joinAndSync(b, docId);
       return { docId, a, b };
     }
 
@@ -370,8 +376,7 @@ describe('Socket handlers (integration)', () => {
       const docId = await makeDoc();
       const editorC = connect(editorToken);
       await connected(editorC);
-      editorC.emit('doc:join', { docId });
-      await once(editorC, 'doc:permission');
+      await joinAndSync(editorC, docId);
 
       const savedP = once<{ timestamp: string }>(editorC, 'doc:saved', 4000);
       editorC.emit('yjs:update', { docId, update: makeUpdate('debounced save text') });
