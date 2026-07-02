@@ -93,8 +93,15 @@ app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// Error handler
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+// Error handler. Client errors carry a 4xx status (e.g. body-parser raises a 400
+// SyntaxError on malformed JSON) — pass those through instead of masking every
+// failure as a 500. Genuine server faults still log and return 500.
+app.use((err: Error & { status?: number; statusCode?: number }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const status = err.status ?? err.statusCode;
+  if (status && status >= 400 && status < 500) {
+    res.status(status).json({ error: err.message || 'Bad request' });
+    return;
+  }
   logger.error({ err }, 'Unhandled error');
   res.status(500).json({ error: 'Internal server error' });
 });

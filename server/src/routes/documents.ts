@@ -196,16 +196,6 @@ router.post('/', async (req: AuthRequest, res: Response) => {
   });
 });
 
-// ─── Share link resolution (no auth needed) ───────────────────────────────────
-router.get('/shared/:token', async (req: AuthRequest, res: Response) => {
-  const doc = await CollabDocument.findOne({ shareLink: req.params.token, deletedAt: null }).select('-yjsState');
-  if (!doc) {
-    res.status(404).json({ error: 'Share link not found' });
-    return;
-  }
-  res.json({ document: doc, permission: doc.shareLinkPermission });
-});
-
 // ─── Restore from trash ───────────────────────────────────────────────────────
 router.patch('/:id/restore', async (req: AuthRequest, res: Response) => {
   const doc = await CollabDocument.findById(req.params.id);
