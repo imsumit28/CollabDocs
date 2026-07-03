@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'CollabDocs — Real-time collaborative editor',
+    name: 'CollabDocs',
     short_name: 'CollabDocs',
     description: 'Write and edit documents together in real time with AI assistance. Works offline.',
     start_url: '/dashboard',

@@ -13,7 +13,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'CollabDocs AI — Collaborate, Create, and Refine',
+  title: 'CollabDocs',
   description: 'Write and edit documents together in real time with AI assistance.',
   verification: {
     google: '-vNmg7PuNLHFfWcYX4IJpq8A-ftDDTR1gFXWY5dvf5w',
