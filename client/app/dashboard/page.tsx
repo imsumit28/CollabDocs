@@ -746,7 +746,12 @@ function DocCard({
   const timeStr = timeAgo(doc.updatedAt);
   const isDeleted = !!doc.deletedAt;
 
+  // Trash retention — keep in sync with TRASH_TTL_DAYS on the server.
+  const TRASH_TTL_DAYS = 7;
+  const purgeDate = isDeleted ? new Date(new Date(doc.deletedAt!).getTime() + TRASH_TTL_DAYS * 24 * 60 * 60 * 1000) : null;
   const daysUntilPurge = isDeleted ? Math.max(1, 7 - Math.floor((Date.now() - new Date(doc.deletedAt!).getTime()) / (1000 * 60 * 60 * 24))) : 0;
+  const purgeDateStr = purgeDate ? purgeDate.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+  const purgeTooltip = isDeleted ? `Will be permanently deleted on ${purgeDateStr}` : '';
 
   const status = isDeleted ? 'Trash' : (!isOwner ? 'Shared' : (doc.shareLink ? 'Shared' : 'Private'));
   const statusColor = isDeleted
@@ -791,7 +796,7 @@ function DocCard({
   };
 
   return (
-    <div className="apple-card group relative overflow-visible flex flex-col h-full hover:shadow-apple-lg transition-all duration-300 bg-white">
+    <div className="apple-card group relative overflow-visible flex flex-col h-full hover:shadow-apple-lg transition-all duration-300 bg-white" title={isDeleted ? purgeTooltip : undefined}>
       <div onClick={() => router.push(`/doc/${doc._id}`)} className="cursor-pointer">
         {/* Thumbnail */}
         <div className="h-28 bg-gradient-to-br from-[#F5F5F7] to-[#E8E8ED] flex items-center justify-center relative overflow-hidden rounded-t-[16px]">
@@ -911,7 +916,11 @@ function DocCard({
               {doc.isLive ? 'Editing' : status}
             </span>
             <span className="text-[11px] text-[#8E8E93] truncate flex-1">
-              {isDeleted ? `Deletes in ${daysUntilPurge}d` : (
+              {isDeleted ? (
+                <span className="text-[#FF3B30] font-medium cursor-help" title={purgeTooltip}>
+                  Deletes in {daysUntilPurge} {daysUntilPurge === 1 ? 'day' : 'days'}
+                </span>
+              ) : (
                 <span className="flex items-center gap-1">
                   {doc.isLive && !isDeleted && (
                     <>
