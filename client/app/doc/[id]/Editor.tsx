@@ -11,6 +11,9 @@ import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
+import ResizableImage from './ResizableImage';
+import Mathematics from '@tiptap/extension-mathematics';
+import 'katex/dist/katex.min.css';
 import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -126,6 +129,14 @@ declare module '@tiptap/core' {
       setFontFamily: (fontFamily: string) => ReturnType;
       unsetFontFamily: () => ReturnType;
     };
+    fontSize: {
+      setFontSize: (fontSize: string) => ReturnType;
+      unsetFontSize: () => ReturnType;
+    };
+    textColor: {
+      setTextColor: (color: string) => ReturnType;
+      unsetTextColor: () => ReturnType;
+    };
   }
 }
 
@@ -171,6 +182,90 @@ const FontFamily = Mark.create({
   },
 });
 
+const FontSize = Mark.create({
+  name: 'fontSize',
+
+  addOptions() {
+    return {
+      HTMLAttributes: {},
+    };
+  },
+
+  addAttributes() {
+    return {
+      fontSize: {
+        default: null,
+        parseHTML: (element) => element.style.fontSize || null,
+        renderHTML: (attributes) => {
+          if (!attributes.fontSize) return {};
+          return { style: `font-size: ${attributes.fontSize}` };
+        },
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: 'span[style*="font-size"]' }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['span', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+  },
+
+  addCommands() {
+    return {
+      setFontSize:
+        (fontSize: string) =>
+        ({ commands }) => commands.setMark(this.name, { fontSize }),
+      unsetFontSize:
+        () =>
+        ({ commands }) => commands.unsetMark(this.name),
+    };
+  },
+});
+
+const TextColor = Mark.create({
+  name: 'textColor',
+
+  addOptions() {
+    return {
+      HTMLAttributes: {},
+    };
+  },
+
+  addAttributes() {
+    return {
+      color: {
+        default: null,
+        parseHTML: (element) => element.style.color || null,
+        renderHTML: (attributes) => {
+          if (!attributes.color) return {};
+          return { style: `color: ${attributes.color}` };
+        },
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: 'span', getAttrs: (el) => ((el as HTMLElement).style.color ? {} : false) }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['span', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+  },
+
+  addCommands() {
+    return {
+      setTextColor:
+        (color: string) =>
+        ({ commands }) => commands.setMark(this.name, { color }),
+      unsetTextColor:
+        () =>
+        ({ commands }) => commands.unsetMark(this.name),
+    };
+  },
+});
+
 const FONT_OPTIONS = [
   { label: 'System', value: '' },
   { label: 'Arial', value: 'Arial, sans-serif' },
@@ -209,6 +304,107 @@ const FONT_OPTIONS = [
   { label: 'Poppins', value: 'Poppins, "Segoe UI", Arial, sans-serif' },
 ];
 
+const SIZE_OPTIONS = [
+  { label: 'Size', value: '' },
+  { label: '12', value: '12px' },
+  { label: '14', value: '14px' },
+  { label: '15', value: '15px' },
+  { label: '16', value: '16px' },
+  { label: '18', value: '18px' },
+  { label: '20', value: '20px' },
+  { label: '24', value: '24px' },
+  { label: '28', value: '28px' },
+  { label: '32', value: '32px' },
+];
+
+const TEXT_COLORS = [
+  { name: 'Default', value: '' },
+  { name: 'Gray',    value: '#6E6E73' },
+  { name: 'Brown',   value: '#A2845E' },
+  { name: 'Red',     value: '#FF3B30' },
+  { name: 'Orange',  value: '#FF9500' },
+  { name: 'Amber',   value: '#B8860B' },
+  { name: 'Green',   value: '#1A7F37' },
+  { name: 'Teal',    value: '#0C8599' },
+  { name: 'Blue',    value: '#007AFF' },
+  { name: 'Indigo',  value: '#5856D6' },
+  { name: 'Purple',  value: '#AF52DE' },
+  { name: 'Pink',    value: '#FF2D55' },
+];
+
+const HIGHLIGHT_COLORS = [
+  { name: 'None',   value: '' },
+  { name: 'Yellow', value: '#FEF08A' },
+  { name: 'Green',  value: '#BBF7D0' },
+  { name: 'Blue',   value: '#BFDBFE' },
+  { name: 'Purple', value: '#E9D5FF' },
+  { name: 'Pink',   value: '#FBCFE8' },
+  { name: 'Orange', value: '#FED7AA' },
+  { name: 'Red',    value: '#FECACA' },
+  { name: 'Gray',   value: '#E5E7EB' },
+];
+
+const EMOJIS = [
+  '😀','😄','😂','🥹','😊','😍','🤩','😎',
+  '🤔','😅','😢','😭','😡','🥳','🤯','😴',
+  '👍','👎','👏','🙏','💪','🤝','👀','💡',
+  '🔥','⭐','✨','🎉','🎯','🚀','✅','❌',
+  '⚠️','❗','❓','💬','📌','📎','📅','⏰',
+  '💯','❤️','🧡','💛','💚','💙','💜','🤍',
+];
+
+function relativeTime(d: Date): string {
+  const secs = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (secs < 10) return 'just now';
+  if (secs < 60) return `${secs}s ago`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  return d.toLocaleDateString();
+}
+
+// Shared icon-button styling for the toolbar (26×26, active = blue fill)
+const ibtnClass = (active?: boolean) =>
+  `w-[26px] h-[26px] flex items-center justify-center rounded-[5px] transition-all duration-150 flex-shrink-0 border ${
+    active
+      ? 'bg-[#007AFF] text-white border-[#007AFF] shadow-sm'
+      : 'text-[#44454A] border-[rgba(0,0,0,0.10)] bg-white hover:bg-[#EBEBEF] hover:text-[#1D1D1F] hover:border-[rgba(0,0,0,0.18)]'
+  }`;
+
+// Popover anchored to a toolbar button. Defined at module level so its open
+// state survives Toolbar re-renders on every editor transaction.
+function ToolbarPopover({ label, active, button, panelClassName, children }: {
+  label: string;
+  active?: boolean;
+  button: React.ReactNode;
+  panelClassName?: string;
+  children: (close: () => void) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative flex-shrink-0">
+      <button
+        type="button"
+        title={label}
+        onMouseDown={(e) => { e.preventDefault(); setOpen((v) => !v); }}
+        className={ibtnClass(active || open)}
+      >
+        {button}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onMouseDown={(e) => { e.preventDefault(); setOpen(false); }} />
+          <div
+            className={`absolute top-full left-0 mt-1.5 z-50 bg-white rounded-[12px] shadow-apple-lg border border-[rgba(0,0,0,0.08)] p-2 anim-pop ${panelClassName || ''}`}
+            onMouseDown={(e) => e.preventDefault()}
+          >
+            {children(() => setOpen(false))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function userColor(userId: string): string {
   let hash = 0;
   for (let i = 0; i < userId.length; i++) hash = userId.charCodeAt(i) + ((hash << 5) - hash);
@@ -224,30 +420,26 @@ function Toolbar({
   onAiToggle,
   onVersionsToggle,
   onCommentsToggle,
-  onShareOpen,
-  saving,
-  isOnline,
-  lastSaved,
+  onImageUpload,
+  commentCount,
   suggestionMode,
   onSuggestionToggle,
   onAcceptAll,
   onRejectAll,
-  onlineUsers,
 }: {
   editor: any;
   onAiToggle: () => void;
   onVersionsToggle: () => void;
   onCommentsToggle: () => void;
-  onShareOpen: () => void;
-  saving: boolean;
-  isOnline: boolean;
-  lastSaved: Date | null;
+  onImageUpload: () => void;
+  commentCount: number;
   suggestionMode: boolean;
   onSuggestionToggle: () => void;
   onAcceptAll: () => void;
   onRejectAll: () => void;
-  onlineUsers: any[];
 }) {
+  // Mobile: advanced groups collapse behind a "⋯" toggle
+  const [moreOpen, setMoreOpen] = useState(false);
 
   if (!editor) return null;
 
@@ -270,8 +462,7 @@ function Toolbar({
         type="button"
         title={label}
         onMouseDown={(e) => { e.preventDefault(); action(); }}
-        className={`w-[26px] h-[26px] flex items-center justify-center rounded-[5px] transition-all duration-100 flex-shrink-0 border
-          ${active ? 'bg-[#007AFF] text-white border-[#007AFF] shadow-sm' : 'text-[#44454A] border-[rgba(0,0,0,0.10)] bg-white hover:bg-[#EBEBEF] hover:text-[#1D1D1F] hover:border-[rgba(0,0,0,0.18)]'}`}
+        className={ibtnClass(active)}
       >
         {children}
       </button>
@@ -298,13 +489,23 @@ function Toolbar({
     editor.chain().focus().setLink({ href: url, target: '_blank' }).run();
   };
 
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:gap-0.5 sm:px-3 border-b border-[rgba(0,0,0,0.07)] bg-white/95 backdrop-blur-sm sticky top-[57px] z-10 sm:min-h-[42px]">
+  // Wrap the selection (or a sample) in $…$ so the Mathematics extension renders it
+  const insertMath = () => {
+    const { from, to } = editor.state.selection;
+    const sel = editor.state.doc.textBetween(from, to, ' ');
+    const latex = sel.trim() || 'E = mc^2';
+    editor.chain().focus().insertContentAt({ from, to }, `$${latex}$`).run();
+  };
 
-      {/* Scrollable formatting tools — full-width row on mobile */}
-      <div className="flex items-center overflow-x-auto px-3 sm:px-0 min-h-[42px] sm:min-h-0 flex-1 min-w-0">
+  const adv = moreOpen ? 'flex' : 'hidden sm:flex';
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center sm:gap-0.5 sm:px-3 border-b border-[rgba(0,0,0,0.07)] bg-white/95 backdrop-blur-sm sm:min-h-[42px]">
+
+      {/* Formatting tools — wrap under ⋯ More on mobile, scroll on desktop */}
+      <div className="flex items-center px-3 sm:px-0 py-1.5 sm:py-0 flex-1 min-w-0 sm:overflow-x-auto sm:min-h-[42px]">
         {/* Big box wrapping all formatting tools */}
-        <div className="flex items-center gap-0.5 border border-[rgba(0,0,0,0.10)] rounded-[8px] bg-[#F5F5F7] px-1.5 py-1 flex-shrink-0">
+        <div className="flex items-center gap-0.5 border border-[rgba(0,0,0,0.10)] rounded-[8px] bg-[#F5F5F7] px-1.5 py-1 flex-wrap sm:flex-nowrap flex-1 sm:flex-none">
 
         {/* Group 1 — History */}
         <IBtn label="Undo (⌘Z)" action={() => editor.chain().focus().undo().run()}>
@@ -316,7 +517,7 @@ function Toolbar({
 
         <Sep />
 
-        {/* Group 2 — Paragraph style */}
+        {/* Group 2 — Text style */}
         <select
           title="Paragraph style"
           value={currentStyle}
@@ -329,25 +530,51 @@ function Toolbar({
           <option value="h3">Heading 3</option>
         </select>
 
+        {/* Heading shortcuts */}
+        <div className={`items-center gap-0.5 ${adv}`}>
+          <IBtn label="Heading 1" active={editor.isActive('heading', { level: 1 })} action={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
+            <span className="text-[11px] font-bold leading-none">H1</span>
+          </IBtn>
+          <IBtn label="Heading 2" active={editor.isActive('heading', { level: 2 })} action={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
+            <span className="text-[11px] font-bold leading-none">H2</span>
+          </IBtn>
+          <IBtn label="Heading 3" active={editor.isActive('heading', { level: 3 })} action={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>
+            <span className="text-[11px] font-bold leading-none">H3</span>
+          </IBtn>
+        </div>
+
+        {/* Group 3 — Font family & size */}
+        <div className={`items-center gap-0.5 ${adv}`}>
+          <Sep />
+          <select
+            title="Font family"
+            value={editor.getAttributes('fontFamily').fontFamily || ''}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v) editor.chain().focus().setFontFamily(v).run();
+              else editor.chain().focus().unsetFontFamily().run();
+            }}
+            className="h-[26px] w-[88px] rounded-[5px] text-[11px] text-[#3A3A3C] bg-white border border-[rgba(0,0,0,0.10)] hover:bg-[#EBEBEF] hover:border-[rgba(0,0,0,0.18)] px-1 outline-none cursor-pointer flex-shrink-0 transition-colors appearance-none truncate"
+          >
+            {FONT_OPTIONS.map((f) => <option key={f.label} value={f.value}>{f.label}</option>)}
+          </select>
+          <select
+            title="Font size"
+            value={editor.getAttributes('fontSize').fontSize || ''}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v) editor.chain().focus().setFontSize(v).run();
+              else editor.chain().focus().unsetFontSize().run();
+            }}
+            className="h-[26px] w-[56px] rounded-[5px] text-[11px] text-[#3A3A3C] bg-white border border-[rgba(0,0,0,0.10)] hover:bg-[#EBEBEF] hover:border-[rgba(0,0,0,0.18)] px-1 outline-none cursor-pointer flex-shrink-0 transition-colors appearance-none"
+          >
+            {SIZE_OPTIONS.map((s) => <option key={s.label} value={s.value}>{s.label}</option>)}
+          </select>
+        </div>
+
         <Sep />
 
-        {/* Group 3 — Font family */}
-        <select
-          title="Font family"
-          value={editor.getAttributes('fontFamily').fontFamily || ''}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (v) editor.chain().focus().setFontFamily(v).run();
-            else editor.chain().focus().unsetFontFamily().run();
-          }}
-          className="h-[26px] w-[88px] rounded-[5px] text-[11px] text-[#3A3A3C] bg-white border border-[rgba(0,0,0,0.10)] hover:bg-[#EBEBEF] hover:border-[rgba(0,0,0,0.18)] px-1 outline-none cursor-pointer flex-shrink-0 transition-colors appearance-none truncate"
-        >
-          {FONT_OPTIONS.map((f) => <option key={f.label} value={f.value}>{f.label}</option>)}
-        </select>
-
-        <Sep />
-
-        {/* Group 4 — Inline marks */}
+        {/* Group 4 — Inline marks & colors */}
         <IBtn label="Bold (⌘B)" active={editor.isActive('bold')} action={() => editor.chain().focus().toggleBold().run()}>
           <span className="text-[13px] font-black leading-none">B</span>
         </IBtn>
@@ -360,54 +587,179 @@ function Toolbar({
         <IBtn label="Strikethrough" active={editor.isActive('strike')} action={() => editor.chain().focus().toggleStrike().run()}>
           <span className="text-[13px] line-through font-semibold leading-none">S</span>
         </IBtn>
-        <IBtn label="Inline code" active={editor.isActive('code')} action={() => editor.chain().focus().toggleCode().run()}>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l-3 3 3 3m8-6l3 3-3 3" /></svg>
-        </IBtn>
-
-        <Sep />
+        <div className={`items-center gap-0.5 ${adv}`}>
+          <ToolbarPopover
+            label="Text color"
+            active={!!editor.getAttributes('textColor').color}
+            panelClassName="w-[172px]"
+            button={
+              <span className="flex flex-col items-center justify-center leading-none">
+                <span className="text-[11px] font-bold leading-none">A</span>
+                <span className="w-3.5 h-[3px] rounded-sm mt-[1px]" style={{ backgroundColor: editor.getAttributes('textColor').color || '#1D1D1F' }} />
+              </span>
+            }
+          >
+            {(close) => (
+              <div className="grid grid-cols-6 gap-1">
+                {TEXT_COLORS.map((c) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    title={c.name}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      if (c.value) editor.chain().focus().setTextColor(c.value).run();
+                      else editor.chain().focus().unsetTextColor().run();
+                      close();
+                    }}
+                    className={`w-6 h-6 rounded-[6px] flex items-center justify-center text-[12px] font-bold border transition-colors duration-150 hover:bg-[#F5F5F7] ${
+                      (editor.getAttributes('textColor').color || '') === c.value ? 'border-[#007AFF]' : 'border-transparent'
+                    }`}
+                    style={{ color: c.value || '#1D1D1F' }}
+                  >
+                    A
+                  </button>
+                ))}
+              </div>
+            )}
+          </ToolbarPopover>
+          <ToolbarPopover
+            label="Highlight color"
+            active={editor.isActive('highlight')}
+            panelClassName="w-[152px]"
+            button={
+              <span
+                className="w-4 h-4 rounded-[4px] border border-[rgba(0,0,0,0.15)] flex items-center justify-center text-[10px] font-bold text-[#1D1D1F]"
+                style={{ backgroundColor: editor.getAttributes('highlight').color || '#FEF08A' }}
+              >
+                A
+              </span>
+            }
+          >
+            {(close) => (
+              <div className="grid grid-cols-5 gap-1">
+                {HIGHLIGHT_COLORS.map((c) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    title={c.name}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      if (c.value) editor.chain().focus().setHighlight({ color: c.value }).run();
+                      else editor.chain().focus().unsetHighlight().run();
+                      close();
+                    }}
+                    className={`w-6 h-6 rounded-[6px] border flex items-center justify-center transition-transform duration-150 hover:scale-110 ${
+                      (editor.getAttributes('highlight').color || '') === c.value ? 'border-[#007AFF]' : 'border-[rgba(0,0,0,0.10)]'
+                    }`}
+                    style={{ backgroundColor: c.value || '#FFFFFF' }}
+                  >
+                    {!c.value && (
+                      <svg className="w-3.5 h-3.5 text-[#FF3B30]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </ToolbarPopover>
+        </div>
 
         {/* Group 5 — Alignment */}
-        <IBtn label="Align left" active={editor.isActive({ textAlign: 'left' })} action={() => editor.chain().focus().setTextAlign('left').run()}>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M3 12h11M3 18h14" /></svg>
-        </IBtn>
-        <IBtn label="Align center" active={editor.isActive({ textAlign: 'center' })} action={() => editor.chain().focus().setTextAlign('center').run()}>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M6 12h12M4.5 18h15" /></svg>
-        </IBtn>
-        <IBtn label="Align right" active={editor.isActive({ textAlign: 'right' })} action={() => editor.chain().focus().setTextAlign('right').run()}>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M10 12h11M7 18h14" /></svg>
-        </IBtn>
+        <div className={`items-center gap-0.5 ${adv}`}>
+          <Sep />
+          <IBtn label="Align left" active={editor.isActive({ textAlign: 'left' })} action={() => editor.chain().focus().setTextAlign('left').run()}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M3 12h11M3 18h14" /></svg>
+          </IBtn>
+          <IBtn label="Align center" active={editor.isActive({ textAlign: 'center' })} action={() => editor.chain().focus().setTextAlign('center').run()}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M6 12h12M4.5 18h15" /></svg>
+          </IBtn>
+          <IBtn label="Align right" active={editor.isActive({ textAlign: 'right' })} action={() => editor.chain().focus().setTextAlign('right').run()}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M10 12h11M7 18h14" /></svg>
+          </IBtn>
+        </div>
 
-        <Sep />
-
-        {/* Group 6 — Lists */}
-        <IBtn label="Bullet list" active={editor.isActive('bulletList')} action={() => editor.chain().focus().toggleBulletList().run()}>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
-        </IBtn>
-        <IBtn label="Numbered list" active={editor.isActive('orderedList')} action={() => editor.chain().focus().toggleOrderedList().run()}>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4a1 1 0 0 1 0-2h1a1 1 0 0 0 0-2H4" /></svg>
-        </IBtn>
-        <IBtn label="Task list" active={editor.isActive('taskList')} action={() => editor.chain().focus().toggleTaskList().run()}>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9 2 2 4-4" /></svg>
-        </IBtn>
-
-        <Sep />
+        {/* Group 6 — Lists, quote & code */}
+        <div className={`items-center gap-0.5 ${adv}`}>
+          <Sep />
+          <IBtn label="Bullet list" active={editor.isActive('bulletList')} action={() => editor.chain().focus().toggleBulletList().run()}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
+          </IBtn>
+          <IBtn label="Numbered list" active={editor.isActive('orderedList')} action={() => editor.chain().focus().toggleOrderedList().run()}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4a1 1 0 0 1 0-2h1a1 1 0 0 0 0-2H4" /></svg>
+          </IBtn>
+          <IBtn label="Task list" active={editor.isActive('taskList')} action={() => editor.chain().focus().toggleTaskList().run()}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9 2 2 4-4" /></svg>
+          </IBtn>
+          <IBtn label="Blockquote" active={editor.isActive('blockquote')} action={() => editor.chain().focus().toggleBlockquote().run()}>
+            <span className="text-[15px] leading-none font-serif mt-1">❝</span>
+          </IBtn>
+          <IBtn label="Inline code" active={editor.isActive('code')} action={() => editor.chain().focus().toggleCode().run()}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l-3 3 3 3m8-6l3 3-3 3" /></svg>
+          </IBtn>
+        </div>
 
         {/* Group 7 — Insert */}
-        <IBtn label="Insert link" active={editor.isActive('link')} action={setLink}>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 0 0-5.656 0l-4 4a4 4 0 1 0 5.656 5.656l1.102-1.101m-.758-4.899a4 4 0 0 0 5.656 0l4-4a4 4 0 0 0-5.656-5.656l-1.1 1.1" /></svg>
-        </IBtn>
-        <IBtn label="Code block" active={editor.isActive('codeBlock')} action={() => editor.chain().focus().toggleCodeBlock().run()}>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
-        </IBtn>
-        <IBtn label="Insert table" action={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6Zm7-3v18" /></svg>
-        </IBtn>
+        <div className={`items-center gap-0.5 ${adv}`}>
+          <Sep />
+          <IBtn label="Insert link" active={editor.isActive('link')} action={setLink}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 0 0-5.656 0l-4 4a4 4 0 1 0 5.656 5.656l1.102-1.101m-.758-4.899a4 4 0 0 0 5.656 0l4-4a4 4 0 0 0-5.656-5.656l-1.1 1.1" /></svg>
+          </IBtn>
+          <IBtn label="Insert image" action={onImageUpload}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          </IBtn>
+          <IBtn label="Insert table" action={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6Zm7-3v18" /></svg>
+          </IBtn>
+          <IBtn label="Horizontal divider" action={() => editor.chain().focus().setHorizontalRule().run()}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeWidth={2} d="M4 12h16M12 5v.01M12 19v.01" /></svg>
+          </IBtn>
+          <IBtn label="Code block" active={editor.isActive('codeBlock')} action={() => editor.chain().focus().toggleCodeBlock().run()}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+          </IBtn>
+          <ToolbarPopover
+            label="Emoji"
+            panelClassName="w-[252px]"
+            button={
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            }
+          >
+            {(close) => (
+              <div className="grid grid-cols-8 gap-0.5 max-h-[176px] overflow-y-auto">
+                {EMOJIS.map((em) => (
+                  <button
+                    key={em}
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().insertContent(em).run(); close(); }}
+                    className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[16px] hover:bg-[#F5F5F7] transition-colors duration-150"
+                  >
+                    {em}
+                  </button>
+                ))}
+              </div>
+            )}
+          </ToolbarPopover>
+          <IBtn label="Equation (KaTeX)" action={insertMath}>
+            <span className="text-[11px] font-semibold leading-none">√x</span>
+          </IBtn>
+        </div>
+
+        {/* Mobile-only overflow toggle */}
+        <button
+          type="button"
+          title={moreOpen ? 'Fewer tools' : 'More tools'}
+          onMouseDown={(e) => { e.preventDefault(); setMoreOpen((v) => !v); }}
+          className={`${ibtnClass(moreOpen)} sm:hidden ml-auto`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeWidth={2.5} d="M5 12h.01M12 12h.01M19 12h.01" /></svg>
+        </button>
 
         </div>{/* end big box */}
       </div>
 
       {/* Action buttons — second row on mobile, inline on desktop */}
-      <div className="flex items-center gap-0.5 flex-shrink-0 px-3 sm:px-0 border-t sm:border-t-0 border-[rgba(0,0,0,0.07)] min-h-[38px] sm:min-h-0">
+      <div className="flex items-center gap-0.5 flex-shrink-0 px-3 sm:px-0 border-t sm:border-t-0 border-[rgba(0,0,0,0.07)] min-h-[38px] sm:min-h-0 overflow-x-auto">
         {/* Spacer in right section */}
         <div className="w-1" />
 
@@ -446,82 +798,36 @@ function Toolbar({
 
         <Sep />
 
-        {/* Save / sync status */}
-        {!isOnline ? (
-          <div className="flex items-center gap-1.5 px-2 h-[24px] rounded-full bg-[#FFF3E0] border border-[#FF9500]/25 text-[11px] font-semibold text-[#B86800] flex-shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#FF9500] animate-pulse" />
-            <span className="hidden sm:inline">Offline</span>
-          </div>
-        ) : saving ? (
-          <div className="flex items-center gap-1.5 text-[11px] text-[#8E8E93] flex-shrink-0">
-            <span className="flex gap-[3px] items-center">
-              <span className="w-[3px] h-[3px] rounded-full bg-[#8E8E93] animate-bounce [animation-delay:0ms]" />
-              <span className="w-[3px] h-[3px] rounded-full bg-[#8E8E93] animate-bounce [animation-delay:120ms]" />
-              <span className="w-[3px] h-[3px] rounded-full bg-[#8E8E93] animate-bounce [animation-delay:240ms]" />
-            </span>
-            <span className="hidden sm:inline">Saving</span>
-          </div>
-        ) : lastSaved ? (
-          <div className="flex items-center gap-1 text-[11px] text-[#34C759] flex-shrink-0">
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
-            <span className="hidden sm:inline">Saved</span>
-          </div>
-        ) : null}
-
-        <div className="hidden sm:block w-px h-4 bg-[rgba(0,0,0,0.09)] mx-[3px] flex-shrink-0" />
-
-        {/* Collaborator avatars */}
-        {onlineUsers.length > 0 && (
-          <div className="hidden sm:flex -space-x-1.5 flex-shrink-0">
-            {onlineUsers.slice(0, 4).map((u) => (
-              <div key={u.id} title={`${getUserLabel(u)} — online`}
-                style={{ backgroundColor: userColor(u.id) }}
-                className="w-5 h-5 rounded-full ring-[1.5px] ring-white flex items-center justify-center text-white text-[9px] font-bold shadow-sm cursor-default">
-                {getUserLabel(u)?.[0]?.toUpperCase()}
-              </div>
-            ))}
-            {onlineUsers.length > 4 && (
-              <div className="w-5 h-5 rounded-full ring-[1.5px] ring-white bg-[#E8E8ED] flex items-center justify-center text-[#6E6E73] text-[9px] font-bold">
-                +{onlineUsers.length - 4}
-              </div>
+        {/* Comments — labelled pill with open-thread count */}
+        <Tip label="Comments">
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); onCommentsToggle(); }}
+            className="flex items-center gap-1.5 px-2.5 h-[26px] rounded-full text-[11px] font-semibold text-[#44454A] border border-[rgba(0,0,0,0.10)] bg-white hover:bg-[#EBEBEF] hover:text-[#1D1D1F] transition-colors duration-150 flex-shrink-0"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+            <span className="hidden sm:inline">Comments</span>
+            {commentCount > 0 && (
+              <span className="anim-pop min-w-[16px] h-4 px-[5px] rounded-full bg-[#007AFF] text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                {commentCount}
+              </span>
             )}
-          </div>
-        )}
-
-        <Sep />
-
-        {/* Comments */}
-        <IBtn label="Comments" action={onCommentsToggle}>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-        </IBtn>
+          </button>
+        </Tip>
 
         {/* Version history */}
         <IBtn label="Version history" action={onVersionsToggle}>
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
         </IBtn>
 
-        {/* Share */}
-        <button
-          type="button"
-          onMouseDown={(e) => { e.preventDefault(); onShareOpen(); }}
-          className="flex items-center gap-1.5 px-3 h-[26px] rounded-full bg-[#1D1D1F] hover:bg-[#3A3A3C] text-white text-[11px] font-semibold transition-colors flex-shrink-0 ml-0.5"
-        >
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
-          <span className="hidden sm:inline">Share</span>
-        </button>
-
-        {/* AI button */}
+        {/* ✨ Ask AI */}
         <button
           type="button"
           onMouseDown={(e) => { e.preventDefault(); onAiToggle(); }}
-          className="flex items-center gap-1.5 px-3 h-[26px] rounded-full bg-gradient-to-r from-[#5856D6] to-[#AF52DE] hover:from-[#4C4AC2] hover:to-[#9B40CC] text-white text-[11px] font-semibold transition-all shadow-[0_1px_6px_rgba(88,86,214,0.40)] hover:shadow-[0_2px_10px_rgba(88,86,214,0.50)] ml-1 flex-shrink-0"
+          className="flex items-center gap-1.5 px-3 h-[26px] rounded-full bg-gradient-to-r from-[#5856D6] to-[#AF52DE] hover:from-[#4C4AC2] hover:to-[#9B40CC] text-white text-[11px] font-semibold transition-all duration-150 shadow-[0_1px_6px_rgba(88,86,214,0.40)] hover:shadow-[0_2px_10px_rgba(88,86,214,0.50)] ml-1 flex-shrink-0"
         >
-          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2l1.09 3.26L16 6l-2.91.74L12 10l-1.09-2.91L8 6l2.91-.74L12 2zm0 12l.72 2.16L15 17l-2.28.84L12 20l-.72-2.16L9 17l2.28-.84L12 14z"/>
-          </svg>
-          <span className="hidden sm:inline">AI</span>
+          <span className="text-[12px] leading-none">✨</span>
+          Ask AI
         </button>
       </div>
     </div>
@@ -625,21 +931,25 @@ function AiPanel({ editor, onClose }: { editor: any; onClose: () => void }) {
   ];
 
   return (
-    <div className="fixed inset-y-0 right-0 z-40 w-full sm:w-80 md:relative md:inset-auto md:z-auto md:w-[300px] border-l border-[rgba(0,0,0,0.08)] bg-[#F5F5F7] flex flex-col overflow-y-auto anim-slide-up flex-shrink-0">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(0,0,0,0.08)] bg-white sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-[7px] bg-[#5856D6] flex items-center justify-center">
-            <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
-          <span className="font-semibold text-[14px] text-[#1D1D1F]">AI Assistant</span>
+    <div className="fixed inset-x-0 bottom-0 z-40 h-[72vh] rounded-t-[20px] border-t shadow-apple-xl sm:shadow-none sm:h-auto sm:rounded-none sm:border-t-0 sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:w-80 md:relative md:inset-auto md:z-auto md:w-[300px] border-l border-[rgba(0,0,0,0.08)] bg-[#F5F5F7] flex flex-col overflow-y-auto anim-panel flex-shrink-0">
+      <div className="border-b border-[rgba(0,0,0,0.08)] bg-white sticky top-0 z-10 rounded-t-[20px] sm:rounded-none">
+        {/* Bottom-sheet grab handle (mobile only) */}
+        <div className="sm:hidden flex justify-center pt-2">
+          <div className="h-1 w-9 rounded-full bg-[#D1D1D6]" />
         </div>
-        <button type="button" aria-label="Close AI panel" onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-full text-[#8E8E93] hover:bg-[#E8E8ED]">
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-[7px] bg-gradient-to-br from-[#5856D6] to-[#AF52DE] flex items-center justify-center text-[12px] leading-none">
+              ✨
+            </div>
+            <span className="font-semibold text-[14px] text-[#1D1D1F]">Ask AI</span>
+          </div>
+          <button type="button" aria-label="Close AI panel" onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-full text-[#8E8E93] hover:bg-[#E8E8ED]">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div className="p-3 space-y-2">
@@ -1257,7 +1567,7 @@ function PresenceBar({ onlineUsers, typingUsers }: { onlineUsers: any[]; typingU
           return (
             <div key={u.id}
               style={{ backgroundColor: userColor(u.id) }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-white text-[11px] font-bold transition-all duration-500 shadow-apple-sm hover:scale-105">
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-white text-[11px] font-bold transition-all duration-500 shadow-apple-sm hover:scale-105 anim-pop">
               <span className="w-4 h-4 rounded-full bg-white/25 flex items-center justify-center text-[9px] font-black flex-shrink-0">
                 {getUserLabel(u)?.[0]?.toUpperCase()}
               </span>
@@ -1301,6 +1611,14 @@ export default function Editor({ docId }: { docId: string }) {
   const [pendingAnchorText, setPendingAnchorText] = useState('');
   const [pendingSelection, setPendingSelection] = useState<{ from: number; to: number } | null>(null);
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
+  const [commentCount, setCommentCount] = useState(0);
+  const [editedAt, setEditedAt] = useState<Date | null>(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+  // Full-width vs. the focused 720px reading column (persisted per browser)
+  const [fullWidth, setFullWidth] = useState(false);
+  // Re-render every 30s so "Last edited … ago" stays fresh
+  const [, setClockTick] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const ydocRef = useRef<Y.Doc | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isTypingRef = useRef(false);
@@ -1309,6 +1627,31 @@ export default function Editor({ docId }: { docId: string }) {
 
   // Keep module-level TrackChanges flag in sync with React state
   useEffect(() => { setTrackChangesEnabled(suggestionMode); }, [suggestionMode]);
+
+  useEffect(() => {
+    const i = setInterval(() => setClockTick((t) => t + 1), 30_000);
+    return () => clearInterval(i);
+  }, []);
+
+  // Favorite state is shared with the dashboard via localStorage
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('collabdocs_favorites') || '[]');
+      setIsFavorite(Array.isArray(stored) && stored.includes(docId));
+    } catch { /* ignore */ }
+  }, [docId]);
+
+  // Slash-menu entries that need editor-page UI (AI panel, image picker)
+  useEffect(() => {
+    const openAi = () => { setAiOpen(true); setVersionsOpen(false); setCommentsOpen(false); };
+    const pickImage = () => fileInputRef.current?.click();
+    window.addEventListener('collabdocs:open-ai', openAi);
+    window.addEventListener('collabdocs:insert-image', pickImage);
+    return () => {
+      window.removeEventListener('collabdocs:open-ai', openAi);
+      window.removeEventListener('collabdocs:insert-image', pickImage);
+    };
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -1360,7 +1703,10 @@ export default function Editor({ docId }: { docId: string }) {
     });
 
     api.get(`/docs/${docId}`)
-      .then((res) => setTitle(res.data.document.title))
+      .then((res) => {
+        setTitle(res.data.document.title);
+        if (res.data.document.updatedAt) setEditedAt(new Date(res.data.document.updatedAt));
+      })
       .catch(() => {});
 
     return () => {
@@ -1390,7 +1736,7 @@ export default function Editor({ docId }: { docId: string }) {
       SlashCommands.configure({
         suggestion: {
           items: ({ query }: { query: string }) => {
-            return getSuggestionItems().filter((item: any) => item.title.toLowerCase().startsWith(query.toLowerCase())).slice(0, 5);
+            return getSuggestionItems().filter((item: any) => item.title.toLowerCase().includes(query.toLowerCase())).slice(0, 12);
           },
           render: renderItems,
         },
@@ -1457,10 +1803,14 @@ export default function Editor({ docId }: { docId: string }) {
       })] : []),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       FontFamily,
-      Highlight,
+      FontSize,
+      TextColor,
+      Highlight.configure({ multicolor: true }),
       Underline,
       Link.configure({ openOnClick: false, HTMLAttributes: { class: 'editor-link' } }),
-      Placeholder.configure({ placeholder: 'Start writing…' }),
+      ResizableImage,
+      Mathematics.configure({ katexOptions: { throwOnError: false } }),
+      Placeholder.configure({ placeholder: 'Start writing, press "/" for commands, or ✨ Ask AI…' }),
     ] as any,
     onUpdate: () => {
       setSaving(true);
@@ -1470,6 +1820,8 @@ export default function Editor({ docId }: { docId: string }) {
   // Reflect the server-authorized permission: viewers get a read-only editor.
   useEffect(() => {
     editor?.setEditable(canEditDoc);
+    // Drives the image cursor/hover hint in globals.css — viewers can't crop.
+    editor?.view.dom.classList.toggle('is-readonly', !canEditDoc);
   }, [editor, canEditDoc]);
 
   const handleTitleBlur = useCallback(async () => {
@@ -1528,6 +1880,66 @@ export default function Editor({ docId }: { docId: string }) {
   const toggleVersions = () => { setVersionsOpen((v) => !v); setAiOpen(false); setCommentsOpen(false); };
   const toggleComments = () => { setCommentsOpen((v) => !v); setAiOpen(false); setVersionsOpen(false); };
 
+  const refreshCommentCount = useCallback(async () => {
+    try {
+      const { data } = await api.get(`/comments/${docId}`);
+      setCommentCount(data.filter((c: any) => !c.parentId && !c.resolved).length);
+    } catch { /* ignore */ }
+  }, [docId]);
+
+  // Re-count when the sidebar opens/closes (threads may get resolved there)
+  useEffect(() => {
+    if (authLoading || !token) return;
+    refreshCommentCount();
+  }, [authLoading, token, commentsOpen, refreshCommentCount]);
+
+  // Restore the saved width preference (client-only to avoid SSR mismatch)
+  useEffect(() => {
+    setFullWidth(localStorage.getItem('collabdocs_full_width') === '1');
+  }, []);
+
+  const toggleFullWidth = () => {
+    setFullWidth((v) => {
+      const next = !v;
+      try { localStorage.setItem('collabdocs_full_width', next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  const toggleFavorite = () => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('collabdocs_favorites') || '[]');
+      const next = new Set<string>(Array.isArray(stored) ? stored : []);
+      if (next.has(docId)) next.delete(docId); else next.add(docId);
+      localStorage.setItem('collabdocs_favorites', JSON.stringify(Array.from(next)));
+      setIsFavorite(next.has(docId));
+      toast.success(next.has(docId) ? 'Added to favorites' : 'Removed from favorites');
+    } catch { /* ignore */ }
+  };
+
+  // Insert a picked image as a base64 data URL (kept small so the Yjs doc stays lean)
+  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !editor) return;
+    if (!file.type.startsWith('image/')) { toast.error('Please choose an image file'); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error('Image is too large — 2 MB max'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      editor.chain().focus().setImage({ src: reader.result as string, alt: file.name }).run();
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const setLinkFromBubble = () => {
+    if (!editor) return;
+    const prev = editor.getAttributes('link').href;
+    const url = window.prompt('URL', prev || 'https://');
+    if (url === null) return;
+    if (!url) { editor.chain().focus().unsetLink().run(); return; }
+    editor.chain().focus().setLink({ href: url, target: '_blank' }).run();
+  };
+
   const addComment = () => {
     if (!editor) return;
     const { from, to } = editor.state.selection;
@@ -1554,6 +1966,7 @@ export default function Editor({ docId }: { docId: string }) {
       setCommentInput('');
       setPendingSelection(null);
       toast.success('Comment added');
+      refreshCommentCount();
     } catch {
       toast.error('Failed to add comment');
     }
@@ -1599,42 +2012,145 @@ export default function Editor({ docId }: { docId: string }) {
     toast.success('All suggestions rejected');
   }
 
+  const lastEdit = lastSaved || editedAt;
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
       <div className="apple-glass border-b border-[rgba(0,0,0,0.08)] sticky top-0 z-10">
-        <div className="flex items-center gap-3 px-4 py-2.5">
+        <div className="flex items-center gap-3 px-4 py-2">
           <button type="button" onClick={() => router.push('/dashboard')} className="flex items-center gap-1.5 text-[#007AFF] hover:text-[#0055D4] text-[13px] font-semibold transition-colors flex-shrink-0">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
             </svg>
             Docs
           </button>
-          <div className="w-px h-4 bg-[rgba(0,0,0,0.12)]" />
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={handleTitleBlur}
-            className="flex-1 font-semibold text-[#1D1D1F] bg-transparent border-none outline-none text-[16px] truncate tracking-tight placeholder:text-[#AEAEB2]"
-            placeholder="Untitled"
-          />
+          <div className="w-px h-4 bg-[rgba(0,0,0,0.12)] flex-shrink-0" />
+
+          {/* Title + live document meta */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <svg className="hidden sm:block w-4 h-4 text-[#AEAEB2] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={handleTitleBlur}
+                className="w-full font-semibold text-[#1D1D1F] bg-transparent border-none outline-none text-[16px] truncate tracking-tight placeholder:text-[#AEAEB2]"
+                placeholder="Untitled"
+              />
+            </div>
+            <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-[#8E8E93] leading-none pl-[22px]">
+              {!isOnline ? (
+                <span className="flex items-center gap-1 text-[#B86800] font-semibold anim-pop">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#FF9500] animate-pulse" />
+                  Offline — changes saved locally
+                </span>
+              ) : saving ? (
+                <span className="anim-pop">Saving…</span>
+              ) : (
+                <>
+                  {lastEdit && <span>Last edited {relativeTime(lastEdit)}</span>}
+                  {lastSaved && (
+                    <span className="flex items-center gap-0.5 text-[#34C759] font-semibold anim-pop">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Saved
+                    </span>
+                  )}
+                </>
+              )}
+              {onlineUsers.length > 1 && (
+                <>
+                  <span>·</span>
+                  <span>{onlineUsers.length} collaborators online</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Collaborator avatars */}
+          {onlineUsers.length > 0 && (
+            <div className="hidden sm:flex -space-x-1.5 flex-shrink-0">
+              {onlineUsers.slice(0, 4).map((u) => (
+                <div key={u.id} title={`${getUserLabel(u)} — online`}
+                  style={{ backgroundColor: userColor(u.id) }}
+                  className="w-6 h-6 rounded-full ring-[1.5px] ring-white flex items-center justify-center text-white text-[9px] font-bold shadow-sm cursor-default anim-pop">
+                  {getUserLabel(u)?.[0]?.toUpperCase()}
+                </div>
+              ))}
+              {onlineUsers.length > 4 && (
+                <div className="w-6 h-6 rounded-full ring-[1.5px] ring-white bg-[#E8E8ED] flex items-center justify-center text-[#6E6E73] text-[9px] font-bold">
+                  +{onlineUsers.length - 4}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Full-width toggle */}
+          <button
+            type="button"
+            title={fullWidth ? 'Focused width' : 'Full width'}
+            onClick={toggleFullWidth}
+            className={`w-7 h-7 flex items-center justify-center rounded-full transition-all duration-150 flex-shrink-0 ${
+              fullWidth ? 'text-[#007AFF] bg-[#007AFF]/10' : 'text-[#AEAEB2] hover:text-[#1D1D1F] hover:bg-[#F5F5F7]'
+            }`}
+          >
+            {fullWidth ? (
+              // Collapse to a centred column
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 4v16M15 4v16M9 9l-3 3 3 3M15 9l3 3-3 3" />
+              </svg>
+            ) : (
+              // Expand to full width
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v16M20 4v16M8 9l-3 3 3 3M16 9l3 3-3 3" />
+              </svg>
+            )}
+          </button>
+
+          {/* Favorite */}
+          <button
+            type="button"
+            title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+            onClick={toggleFavorite}
+            className={`w-7 h-7 flex items-center justify-center rounded-full transition-all duration-150 flex-shrink-0 ${
+              isFavorite ? 'text-[#FFB800]' : 'text-[#AEAEB2] hover:text-[#FFB800] hover:bg-[#F5F5F7]'
+            }`}
+          >
+            <svg className="w-4 h-4" fill={isFavorite ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.563.563 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+            </svg>
+          </button>
+
+          {/* Share */}
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="flex items-center gap-1.5 px-3 h-[26px] rounded-full bg-[#1D1D1F] hover:bg-[#3A3A3C] text-white text-[11px] font-semibold transition-colors duration-150 flex-shrink-0"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+            <span className="hidden sm:inline">Share</span>
+          </button>
         </div>
         <Toolbar
           editor={editor}
           onAiToggle={toggleAi}
           onVersionsToggle={toggleVersions}
           onCommentsToggle={toggleComments}
-          onShareOpen={() => setShareOpen(true)}
-          saving={saving}
-          isOnline={isOnline}
-          lastSaved={lastSaved}
+          onImageUpload={() => fileInputRef.current?.click()}
+          commentCount={commentCount}
           suggestionMode={suggestionMode}
           onSuggestionToggle={() => setSuggestionMode(!suggestionMode)}
           onAcceptAll={acceptAllSuggestions}
           onRejectAll={rejectAllSuggestions}
-          onlineUsers={onlineUsers}
         />
       </div>
+
+      {/* Hidden file input backing the toolbar / slash-menu image upload */}
+      <input ref={fileInputRef} type="file" accept="image/*" aria-label="Upload image" className="hidden" onChange={handleImageFile} />
 
       {/* Presence bar — outside the sticky header so nothing clips it */}
       <PresenceBar onlineUsers={onlineUsers} typingUsers={typingUsers} />
@@ -1656,43 +2172,70 @@ export default function Editor({ docId }: { docId: string }) {
             }
           }}
         >
-          <div className="max-w-[720px] mx-auto px-4 sm:px-8 py-8 sm:py-14 anim-slide-up">
+          <div className={`mx-auto px-4 sm:px-8 py-8 sm:py-14 anim-slide-up transition-[max-width] duration-200 ${fullWidth ? 'max-w-none' : 'max-w-[720px]'}`}>
             {editor && (
               <BubbleMenu
                 editor={editor}
                 tippyOptions={{ duration: 100, placement: 'top-start' }}
                 shouldShow={({ state }) => {
+                  // Text formatting only — never over a selected image/atom node,
+                  // which owns its own floating toolbar in the NodeView.
+                  if ((state.selection as any).node) return false;
                   const { from, to } = state.selection;
                   return from !== to;
                 }}
               >
-                <div className="flex items-center gap-0.5 bg-[#1D1D1F] rounded-[10px] px-1.5 py-1 shadow-apple-xl">
+                <div className="flex items-center gap-0.5 bg-[#1D1D1F] rounded-[10px] px-1.5 py-1 shadow-apple-xl anim-pop">
+                  <button
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleBold().run(); }}
+                    className={`px-2 py-1 rounded-[7px] text-[13px] font-bold transition-colors duration-150 ${editor.isActive('bold') ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15 hover:text-white'}`}
+                  >B</button>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }}
+                    className={`px-2 py-1 rounded-[7px] text-[13px] font-semibold italic transition-colors duration-150 ${editor.isActive('italic') ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15 hover:text-white'}`}
+                  >I</button>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleUnderline().run(); }}
+                    className={`px-2 py-1 rounded-[7px] text-[13px] font-semibold underline transition-colors duration-150 ${editor.isActive('underline') ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15 hover:text-white'}`}
+                  >U</button>
+                  <button
+                    type="button"
+                    title="Highlight"
+                    onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleHighlight({ color: '#FEF08A' }).run(); }}
+                    className={`px-2 py-1 rounded-[7px] transition-colors duration-150 ${editor.isActive('highlight') ? 'bg-white/20' : 'hover:bg-white/15'}`}
+                  >
+                    <span className="block w-4 h-4 rounded-[3px] bg-[#FEF08A] text-[#1D1D1F] text-[10px] font-bold leading-4 text-center">A</span>
+                  </button>
+                  <button
+                    type="button"
+                    title="Insert link"
+                    onMouseDown={(e) => { e.preventDefault(); setLinkFromBubble(); }}
+                    className={`px-2 py-1 rounded-[7px] transition-colors duration-150 ${editor.isActive('link') ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15 hover:text-white'}`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 0 0-5.656 0l-4 4a4 4 0 1 0 5.656 5.656l1.102-1.101m-.758-4.899a4 4 0 0 0 5.656 0l4-4a4 4 0 0 0-5.656-5.656l-1.1 1.1" /></svg>
+                  </button>
+                  <div className="w-px h-4 bg-white/20 mx-0.5" />
+                  <button
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); toggleAi(); }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-[7px] text-white text-[12px] font-semibold hover:bg-white/15 transition-colors duration-150"
+                  >
+                    <span className="text-[12px] leading-none">✨</span>
+                    AI
+                  </button>
                   <button
                     type="button"
                     onMouseDown={(e) => { e.preventDefault(); addComment(); }}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-[7px] text-white text-[12px] font-semibold hover:bg-white/15 transition-colors"
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-[7px] text-white text-[12px] font-semibold hover:bg-white/15 transition-colors duration-150"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
                     Comment
                   </button>
-                  <div className="w-px h-4 bg-white/20 mx-0.5" />
-                  <button
-                    type="button"
-                    onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleBold().run(); }}
-                    className={`px-2 py-1 rounded-[7px] text-[13px] font-bold transition-colors ${editor.isActive('bold') ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15 hover:text-white'}`}
-                  >B</button>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }}
-                    className={`px-2 py-1 rounded-[7px] text-[13px] font-semibold italic transition-colors ${editor.isActive('italic') ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15 hover:text-white'}`}
-                  >I</button>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleUnderline().run(); }}
-                    className={`px-2 py-1 rounded-[7px] text-[13px] font-semibold underline transition-colors ${editor.isActive('underline') ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15 hover:text-white'}`}
-                  >U</button>
                 </div>
               </BubbleMenu>
             )}
