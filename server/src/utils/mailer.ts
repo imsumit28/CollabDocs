@@ -11,6 +11,17 @@ const LOGO_URL =
     ? `${process.env.CLIENT_URL}/collabdocs-logo-full.png`
     : '');
 
+// Escape user-controlled strings (document titles, display names) before they
+// land inside email HTML, so a title like `<img onerror=…>` can't inject markup.
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function createTransport() {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
   if (!SMTP_HOST) return null;
@@ -292,6 +303,94 @@ export async function sendOAuthResetNoticeEmail(to: string, displayName?: string
     });
   } catch (err) {
     logger.error({ to, err: (err as Error).message }, '[mailer] FAILED to send OAuth reset notice');
+    throw err;
+  }
+}
+
+function renderShareInviteHtml(opts: {
+  inviterName: string;
+  documentTitle: string;
+  docUrl: string;
+  canEdit: boolean;
+  greetingName: string;
+}): string {
+  const accessLabel = opts.canEdit ? 'Can edit' : 'Can view';
+  const verb = opts.canEdit ? 'edit' : 'view';
+  // Escape the title/name — they're user-controlled and land inside HTML.
+  const title = escapeHtml(opts.documentTitle);
+  const inviter = escapeHtml(opts.inviterName);
+
+  const content = `
+          <tr>
+            <td style="padding:36px 32px 8px 32px;">
+              <h1 style="margin:0 0 6px 0;font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.4px;">${inviter} shared a document</h1>
+              <p style="margin:0 0 4px 0;font-size:15px;color:#475569;">Hello ${escapeHtml(opts.greetingName)},</p>
+              <p style="margin:0 0 20px 0;font-size:15px;color:#64748b;line-height:1.5;">${inviter} invited you to ${verb} the document <strong style="color:#0f172a;">“${title}”</strong> on CollabDocs.</p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:0 32px 16px 32px;">
+              <span style="display:inline-block;background-color:#eff6ff;color:#2563eb;font-size:13px;font-weight:600;padding:7px 14px;border-radius:999px;">${accessLabel}</span>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:0 32px 28px 32px;">
+              <a href="${opts.docUrl}" style="display:inline-block;background-color:#0f172a;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:13px 30px;border-radius:10px;">Open document</a>
+            </td>
+          </tr>
+          <tr><td style="padding:0 32px;"><div style="border-top:1px solid #eef2f7;"></div></td></tr>
+          <tr>
+            <td style="padding:20px 32px 32px 32px;">
+              <p style="margin:0 0 10px 0;font-size:13px;color:#94a3b8;line-height:1.6;">
+                If the button doesn't work, copy and paste this link into your browser:
+              </p>
+              <p style="margin:0;font-size:12px;color:#64748b;word-break:break-all;">
+                <a href="${opts.docUrl}" style="color:#2563eb;text-decoration:underline;">${opts.docUrl}</a>
+              </p>
+              <p style="margin:16px 0 0 0;font-size:13px;color:#94a3b8;line-height:1.6;">
+                If you weren't expecting this, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>`;
+
+  return renderEmailLayout({
+    title: `${opts.inviterName} shared "${opts.documentTitle}" with you`,
+    preheader: `${opts.inviterName} invited you to ${verb} “${opts.documentTitle}” on CollabDocs.`,
+    content,
+  });
+}
+
+// Notify a person that a document was shared with them, via a real email (in
+// addition to the in-app notification). Best-effort at the call site: a delivery
+// failure must not fail the share itself, which is already persisted.
+export async function sendShareInviteEmail(opts: {
+  to: string;
+  inviterName: string;
+  documentTitle: string;
+  documentId: string;
+  permission: 'view' | 'edit';
+}): Promise<void> {
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+  const docUrl = `${clientUrl}/doc/${opts.documentId}`;
+  const greetingName = opts.to.split('@')[0];
+  const title = opts.documentTitle || 'Untitled';
+  const canEdit = opts.permission === 'edit';
+  const verb = canEdit ? 'edit' : 'view';
+
+  try {
+    await dispatchEmail({
+      to: opts.to,
+      subject: `${opts.inviterName} shared "${title}" with you`,
+      text:
+        `Hello ${greetingName},\n\n` +
+        `${opts.inviterName} invited you to ${verb} the document "${title}" on CollabDocs.\n\n` +
+        `Open it here:\n${docUrl}\n\n` +
+        `If you weren't expecting this, you can safely ignore this email.`,
+      html: renderShareInviteHtml({ inviterName: opts.inviterName, documentTitle: title, docUrl, canEdit, greetingName }),
+      devLog: { docUrl, permission: opts.permission },
+    });
+  } catch (err) {
+    logger.error({ to: opts.to, err: (err as Error).message }, '[mailer] FAILED to send share invite');
     throw err;
   }
 }

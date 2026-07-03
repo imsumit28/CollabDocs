@@ -1,9 +1,17 @@
 import request from 'supertest';
 import express, { Express } from 'express';
 import { Types } from 'mongoose';
+
+// Mock the mailer so inviting a collaborator doesn't attempt a real send, and we
+// can assert an email invite is dispatched.
+jest.mock('../../utils/mailer', () => ({
+  sendShareInviteEmail: jest.fn().mockResolvedValue(undefined),
+}));
+
 import documentRoutes from '../../routes/documents';
 import { generateAccessToken } from '../helpers';
 import { CollabDocument, User } from '../../models';
+import { sendShareInviteEmail } from '../../utils/mailer';
 import cookieParser from 'cookie-parser';
 
 describe('Document Routes', () => {
@@ -352,6 +360,7 @@ describe('Document Routes', () => {
       ownerToken = generateAccessToken(ownerId);
       const doc = await CollabDocument.create({ title: 'Shared Doc', ownerId });
       docId = doc.id;
+      (sendShareInviteEmail as jest.Mock).mockClear();
     });
 
     const ownerAuth = () => ({ Authorization: `Bearer ${ownerToken}` });
@@ -370,6 +379,41 @@ describe('Document Routes', () => {
         displayName: 'Invitee',
         permission: 'edit',
       });
+    });
+
+    it('emails the invitee when newly added', async () => {
+      await request(app)
+        .post(`/api/docs/${docId}/collaborators`)
+        .set(ownerAuth())
+        .send({ email: 'invitee@example.com', permission: 'edit' });
+
+      expect(sendShareInviteEmail as jest.Mock).toHaveBeenCalledTimes(1);
+      expect(sendShareInviteEmail as jest.Mock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'invitee@example.com',
+          inviterName: 'Test User', // from the signed JWT, not the DB user record
+          documentTitle: 'Shared Doc',
+          documentId: docId,
+          permission: 'edit',
+        }),
+      );
+    });
+
+    it('does not re-email on a permission change to an existing collaborator', async () => {
+      await request(app).post(`/api/docs/${docId}/collaborators`).set(ownerAuth()).send({ email: 'invitee@example.com', permission: 'view' });
+      (sendShareInviteEmail as jest.Mock).mockClear();
+      await request(app).post(`/api/docs/${docId}/collaborators`).set(ownerAuth()).send({ email: 'invitee@example.com', permission: 'edit' });
+      expect(sendShareInviteEmail as jest.Mock).not.toHaveBeenCalled();
+    });
+
+    it('still succeeds (invite persists) when the email send fails', async () => {
+      (sendShareInviteEmail as jest.Mock).mockRejectedValueOnce(new Error('smtp down'));
+      const res = await request(app)
+        .post(`/api/docs/${docId}/collaborators`)
+        .set(ownerAuth())
+        .send({ email: 'invitee@example.com', permission: 'view' });
+      expect(res.status).toBe(201);
+      expect(res.body.collaborators).toHaveLength(1);
     });
 
     it('defaults to view permission', async () => {

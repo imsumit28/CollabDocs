@@ -4,6 +4,7 @@ import { CollabDocument, User, Folder, IDocument } from '../models';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { validateTitle, validateEmail, validateShareLinkPermission, isValidObjectId } from '../utils/validation';
 import { notifyShare } from '../utils/notifications';
+import { sendShareInviteEmail } from '../utils/mailer';
 import { refreshDocPermissions } from '../socket';
 import { logger } from '../utils/logger';
 import { Types } from 'mongoose';
@@ -357,6 +358,20 @@ router.post('/:id/collaborators', async (req: AuthRequest, res: Response) => {
       documentTitle: doc.title,
       permission,
     });
+
+    // Send a real email invite too. Best-effort: the collaborator is already
+    // persisted, so a mail-delivery failure must not fail the request.
+    try {
+      await sendShareInviteEmail({
+        to: invitee.email,
+        inviterName: req.user!.displayName,
+        documentTitle: doc.title,
+        documentId: doc.id,
+        permission,
+      });
+    } catch {
+      /* failure already logged in the mailer */
+    }
   }
 
   res.status(201).json({ collaborators: await buildCollaboratorList(doc) });

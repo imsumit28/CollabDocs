@@ -1194,7 +1194,7 @@ function ShareModal({ docId, onClose, toast }: { docId: string; onClose: () => v
       const res = await api.post(`/docs/${docId}/collaborators`, { email: inviteEmail.trim(), permission: invitePerm });
       setPeople(res.data.collaborators || []);
       setInviteEmail('');
-      toast.success('Invitation added');
+      toast.success('Invitation sent');
     } catch (e: any) {
       setInviteError(e.response?.data?.error || 'Could not add that person');
     } finally {
