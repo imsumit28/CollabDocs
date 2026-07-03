@@ -3,7 +3,7 @@ import type { AddressInfo } from 'net';
 import { io as ioClient, Socket as ClientSocket } from 'socket.io-client';
 import * as Y from 'yjs';
 import { Server as SocketIOServer } from 'socket.io';
-import { initSocket } from '../../socket';
+import { initSocket, refreshDocPermissions } from '../../socket';
 import { CollabDocument, User } from '../../models';
 import { generateAccessToken } from '../helpers';
 
@@ -301,6 +301,74 @@ describe('Socket handlers (integration)', () => {
       expect(after?.contentText).not.toContain('VIEWER SHOULD NOT PERSIST');
       // The editor's earlier content survives.
       expect(after?.contentText).toContain('Persisted editor text');
+    });
+  });
+
+  // ─── live permission changes (refreshDocPermissions) ──────────────────────────
+  // Mirrors what the REST /share and /collaborators handlers do after a save:
+  // re-evaluate everyone already in the room and push the change without a refresh.
+  describe('live permission changes', () => {
+    it('downgrades a live editor to view and stops honoring their edits', async () => {
+      const docId = await makeDoc();
+      const ownerC = connect(ownerToken);
+      const editorC = connect(editorToken);
+      await Promise.all([connected(ownerC), connected(editorC)]);
+      await joinAndSync(ownerC, docId);
+      await joinAndSync(editorC, docId);
+
+      // Owner re-permissions the editor to view-only, then triggers a live refresh.
+      await CollabDocument.findByIdAndUpdate(docId, {
+        collaborators: [
+          { userId: editorId, permission: 'view' },
+          { userId: viewerId, permission: 'view' },
+        ],
+      });
+      const permP = once(editorC, 'doc:permission');
+      await refreshDocPermissions(docId);
+      await expect(permP).resolves.toEqual({ docId, permission: 'view' });
+
+      // The now-view-only editor's update must no longer be relayed (write-gate flipped).
+      let ownerGotUpdate = false;
+      ownerC.on('yjs:update', () => { ownerGotUpdate = true; });
+      editorC.emit('yjs:update', { docId, update: makeUpdate('edit after downgrade') });
+      await wait(400);
+      expect(ownerGotUpdate).toBe(false);
+    });
+
+    it('upgrades a live viewer to edit and begins relaying their edits', async () => {
+      const docId = await makeDoc();
+      const ownerC = connect(ownerToken);
+      const viewerC = connect(viewerToken);
+      await Promise.all([connected(ownerC), connected(viewerC)]);
+      await joinAndSync(ownerC, docId);
+      await joinAndSync(viewerC, docId);
+
+      await CollabDocument.findByIdAndUpdate(docId, {
+        collaborators: [
+          { userId: editorId, permission: 'edit' },
+          { userId: viewerId, permission: 'edit' },
+        ],
+      });
+      const permP = once(viewerC, 'doc:permission');
+      await refreshDocPermissions(docId);
+      await expect(permP).resolves.toEqual({ docId, permission: 'edit' });
+
+      const relayed = once(ownerC, 'yjs:update');
+      const update = makeUpdate('viewer now edits');
+      viewerC.emit('yjs:update', { docId, update });
+      await expect(relayed).resolves.toEqual({ update });
+    });
+
+    it('revokes a share-link viewer when link sharing is disabled', async () => {
+      const docId = await makeDoc({ shareLink: 'live-token', shareLinkPermission: 'view' });
+      const strangerC = connect(strangerToken);
+      await connected(strangerC);
+      await joinAndSync(strangerC, docId, 'live-token');
+
+      await CollabDocument.findByIdAndUpdate(docId, { shareLink: null, shareLinkPermission: null });
+      const revokedP = once(strangerC, 'doc:access-revoked');
+      await refreshDocPermissions(docId);
+      await expect(revokedP).resolves.toEqual({ docId });
     });
   });
 

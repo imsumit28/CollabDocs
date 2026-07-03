@@ -20,6 +20,10 @@ interface DocRoom {
 
 const docRooms = new Map<string, DocRoom>();
 
+// The live Socket.IO server, set by initSocket(). Module-level so REST handlers
+// (via refreshDocPermissions) can push permission changes into open rooms.
+let ioRef: SocketServer | null = null;
+
 export function getDocRoom(docId: string): DocRoom | undefined {
   return docRooms.get(docId);
 }
@@ -67,12 +71,72 @@ export async function flushAllRooms(): Promise<void> {
   await Promise.allSettled(docIds.map((docId) => flushAndClean(docId)));
 }
 
+/**
+ * Re-evaluate every open participant's permission on a document after a sharing
+ * change (share link toggled/re-scoped, a collaborator added/removed/re-permed),
+ * and push the result live — no page refresh required.
+ *
+ * For each socket currently in the room we recompute permission from the fresh
+ * DB state using the same share token they joined with, then:
+ *   - if they lost all access (e.g. link sharing disabled and they aren't a
+ *     collaborator) → emit `doc:access-revoked`, drop them from the room, and
+ *     stop honoring their edits;
+ *   - otherwise update the cached permission (so the `yjs:update` write-gate
+ *     takes effect immediately) and, when it changed, emit `doc:permission`.
+ *
+ * No-ops safely when the socket server isn't running (e.g. under Jest / REST-only
+ * tests). Single-instance correct; multi-node would additionally need the trigger
+ * fanned out over the Redis adapter.
+ */
+export async function refreshDocPermissions(docId: string): Promise<void> {
+  if (!ioRef) return;
+
+  let dbDoc;
+  try {
+    dbDoc = await CollabDocument.findById(docId);
+  } catch {
+    return;
+  }
+
+  let revoked = false;
+  for (const socket of ioRef.sockets.sockets.values()) {
+    if (!socket.rooms.has(docId)) continue;
+
+    const userId = socket.data?.user?.sub;
+    const perms: Map<string, DocPermission> | undefined = socket.data?.roomPermissions;
+    const tokens: Map<string, string | null> | undefined = socket.data?.roomShareTokens;
+    if (!userId || !perms) continue;
+
+    const perm = resolveJoinPermission(dbDoc, userId, tokens?.get(docId) ?? null);
+
+    if (!perm) {
+      socket.emit('doc:access-revoked', { docId });
+      socket.leave(docId);
+      perms.delete(docId);
+      tokens?.delete(docId);
+      revoked = true;
+      continue;
+    }
+
+    const prev = perms.get(docId);
+    perms.set(docId, perm);
+    if (prev !== perm) socket.emit('doc:permission', { docId, permission: perm });
+  }
+
+  // If anyone was removed, refresh the presence list for whoever remains.
+  if (revoked) {
+    const remaining = await ioRef.in(docId).fetchSockets();
+    ioRef.to(docId).emit('doc:awareness', { users: dedupeUsers(remaining) });
+  }
+}
+
 // ─── Main Socket init ─────────────────────────────────────────────────────────
 export function initSocket(server: HTTPServer): SocketServer {
   const io = new SocketServer(server, {
     cors: { origin: process.env.CLIENT_URL || 'http://localhost:3000', credentials: true },
     maxHttpBufferSize: 5e6,
   });
+  ioRef = io;
 
   // Redis adapter for horizontal scaling (optional)
   if (process.env.REDIS_URL) {
@@ -113,8 +177,14 @@ export function initSocket(server: HTTPServer): SocketServer {
     const user = socket.data.user;
     // Track which doc rooms this socket has joined for disconnect cleanup
     const joinedRooms = new Set<string>();
-    // Track this socket's permission per room so we can enforce read-only access
+    // Track this socket's permission + share token per room so we can enforce
+    // read-only access AND re-evaluate it live when the owner changes sharing.
+    // Stored on socket.data (not a closure) so refreshDocPermissions() — invoked
+    // from REST handlers — can reach and update it.
     const roomPermissions = new Map<string, DocPermission>();
+    const roomShareTokens = new Map<string, string | null>();
+    socket.data.roomPermissions = roomPermissions;
+    socket.data.roomShareTokens = roomShareTokens;
 
     logger.debug({ user: user.displayName, socketId: socket.id }, 'Socket connected');
 
@@ -130,6 +200,7 @@ export function initSocket(server: HTTPServer): SocketServer {
         socket.join(docId);
         joinedRooms.add(docId);
         roomPermissions.set(docId, permission);
+        roomShareTokens.set(docId, shareToken ?? null);
         socket.emit('doc:permission', { docId, permission });
 
         // Initialise Y.Doc for this room
@@ -213,6 +284,7 @@ export function initSocket(server: HTTPServer): SocketServer {
       socket.leave(docId);
       joinedRooms.delete(docId);
       roomPermissions.delete(docId);
+      roomShareTokens.delete(docId);
 
       const remaining = await io.in(docId).fetchSockets();
       if (remaining.length === 0) {

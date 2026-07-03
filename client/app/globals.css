@@ -192,6 +192,11 @@ body {
   caret-color: var(--brand);
 }
 
+/* View-only mode: no text caret, default cursor over content and images so the
+   surface reads as read-only. Selection & copy still work. */
+.ProseMirror.is-readonly { caret-color: transparent; }
+.ProseMirror.is-readonly .image-node img { cursor: default; }
+
 .ProseMirror p.is-editor-empty:first-child::before {
   color: var(--apple-text-tertiary);
   content: attr(data-placeholder);

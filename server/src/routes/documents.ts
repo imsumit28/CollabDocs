@@ -4,6 +4,7 @@ import { CollabDocument, User, Folder, IDocument } from '../models';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { validateTitle, validateEmail, validateShareLinkPermission, isValidObjectId } from '../utils/validation';
 import { notifyShare } from '../utils/notifications';
+import { refreshDocPermissions } from '../socket';
 import { logger } from '../utils/logger';
 import { Types } from 'mongoose';
 
@@ -291,6 +292,11 @@ router.post('/:id/share', async (req: AuthRequest, res: Response) => {
   }
 
   await doc.save();
+
+  // Push the new link permission (or the revoked link) to everyone currently in
+  // the live room so read-only state flips without a refresh.
+  await refreshDocPermissions(doc.id);
+
   res.json({
     shareLink: doc.shareLink,
     shareLinkPermission: doc.shareLinkPermission,
@@ -338,6 +344,9 @@ router.post('/:id/collaborators', async (req: AuthRequest, res: Response) => {
 
   await doc.save();
 
+  // A re-permissioned collaborator who is already in the room flips live.
+  await refreshDocPermissions(doc.id);
+
   // Notify the invitee only when newly added (not on a permission change)
   if (isNew) {
     await notifyShare({
@@ -366,6 +375,11 @@ router.delete('/:id/collaborators/:userId', async (req: AuthRequest, res: Respon
   if (doc.collaborators.length === before) { res.status(404).json({ error: 'Collaborator not found' }); return; }
 
   await doc.save();
+
+  // A removed collaborator loses live access immediately (unless a share link
+  // still covers them), so re-evaluate the room.
+  await refreshDocPermissions(doc.id);
+
   res.json({ collaborators: await buildCollaboratorList(doc) });
 });
 

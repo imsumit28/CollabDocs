@@ -45,7 +45,7 @@ const CommandList = forwardRef((props: any, ref) => {
   }));
 
   return (
-    <div className="bg-white rounded-[12px] shadow-apple-lg border border-[rgba(0,0,0,0.08)] py-2 min-w-[200px] overflow-hidden anim-scale-in">
+    <div className="bg-white rounded-[12px] shadow-apple-lg border border-[rgba(0,0,0,0.08)] py-2 min-w-[220px] max-h-[330px] overflow-y-auto anim-scale-in">
       {props.items.length ? (
         props.items.map((item: any, index: number) => (
           <button
@@ -114,11 +114,27 @@ export const getSuggestionItems = () => {
       },
     },
     {
-      title: 'Code Block',
-      description: 'Syntax highlighted code',
-      icon: '</>',
+      title: 'Heading 3',
+      description: 'Small section heading',
+      icon: 'H3',
       action: (editor: any, range: any) => {
-        editor.chain().focus().deleteRange(range).toggleCodeBlock().run();
+        editor.chain().focus().deleteRange(range).setNode('heading', { level: 3 }).run();
+      },
+    },
+    {
+      title: 'Bullet List',
+      description: 'Simple bulleted list',
+      icon: '•',
+      action: (editor: any, range: any) => {
+        editor.chain().focus().deleteRange(range).toggleBulletList().run();
+      },
+    },
+    {
+      title: 'Numbered List',
+      description: 'Ordered list with numbers',
+      icon: '1.',
+      action: (editor: any, range: any) => {
+        editor.chain().focus().deleteRange(range).toggleOrderedList().run();
       },
     },
     {
@@ -135,6 +151,56 @@ export const getSuggestionItems = () => {
       icon: '▦',
       action: (editor: any, range: any) => {
         editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+      },
+    },
+    {
+      title: 'Image',
+      description: 'Upload an image',
+      icon: '🖼️',
+      action: (editor: any, range: any) => {
+        editor.chain().focus().deleteRange(range).run();
+        window.dispatchEvent(new CustomEvent('collabdocs:insert-image'));
+      },
+    },
+    {
+      title: 'Code Block',
+      description: 'Syntax highlighted code',
+      icon: '</>',
+      action: (editor: any, range: any) => {
+        editor.chain().focus().deleteRange(range).toggleCodeBlock().run();
+      },
+    },
+    {
+      title: 'Quote',
+      description: 'Capture a quotation',
+      icon: '❝',
+      action: (editor: any, range: any) => {
+        editor.chain().focus().deleteRange(range).toggleBlockquote().run();
+      },
+    },
+    {
+      title: 'Divider',
+      description: 'Horizontal divider line',
+      icon: '—',
+      action: (editor: any, range: any) => {
+        editor.chain().focus().deleteRange(range).setHorizontalRule().run();
+      },
+    },
+    {
+      title: 'Math',
+      description: 'Inline equation (KaTeX)',
+      icon: '√x',
+      action: (editor: any, range: any) => {
+        editor.chain().focus().deleteRange(range).insertContent('$E = mc^2$').run();
+      },
+    },
+    {
+      title: 'Ask AI',
+      description: 'Open the AI assistant',
+      icon: '✨',
+      action: (editor: any, range: any) => {
+        editor.chain().focus().deleteRange(range).run();
+        window.dispatchEvent(new CustomEvent('collabdocs:open-ai'));
       },
     },
   ];

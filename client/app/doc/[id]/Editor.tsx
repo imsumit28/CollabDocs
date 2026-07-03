@@ -1606,6 +1606,10 @@ export default function Editor({ docId }: { docId: string }) {
   const [provider, setProvider] = useState<SocketIOProvider | null>(null);
   const [isOnline, setIsOnline] = useState(true);
   const [canEditDoc, setCanEditDoc] = useState(true);
+  // Set when the server refuses (or revokes) access, so we show a friendly
+  // screen instead of a blank editor. 'unshared' = arrived via a link that is no
+  // longer shared; 'noaccess' = not permitted; 'notfound' = missing document.
+  const [joinError, setJoinError] = useState<'unshared' | 'noaccess' | 'notfound' | null>(null);
   const [commentOpen, setCommentOpen] = useState(false);
   const [commentInput, setCommentInput] = useState('');
   const [pendingAnchorText, setPendingAnchorText] = useState('');
@@ -1677,7 +1681,23 @@ export default function Editor({ docId }: { docId: string }) {
     const shareToken = new URLSearchParams(window.location.search).get('share');
     socket.emit('doc:join', { docId, shareToken });
     socket.on('doc:permission', ({ permission }: { permission: 'owner' | 'edit' | 'view' }) => {
+      // A successful (re)authorization clears any prior denial (e.g. the owner
+      // just re-enabled sharing or upgraded us) and reflects the new level live.
+      setJoinError(null);
       setCanEditDoc(permission === 'owner' || permission === 'edit');
+    });
+
+    // Access was refused on join, or revoked mid-session (owner disabled the
+    // link / removed us). Show a screen instead of a silently-broken editor.
+    const showDenied = () =>
+      setJoinError(shareToken ? 'unshared' : 'noaccess');
+    socket.on('error', ({ message }: { message?: string }) => {
+      if (message === 'Document not found') setJoinError('notfound');
+      else if (message === 'Access denied') showDenied();
+    });
+    socket.on('doc:access-revoked', () => {
+      setCanEditDoc(false);
+      showDenied();
     });
     socket.on('doc:awareness', ({ users }: any) => setOnlineUsers(users));
     socket.on('doc:saved', () => {
@@ -1716,6 +1736,8 @@ export default function Editor({ docId }: { docId: string }) {
       socket.off('connect');
       socket.off('disconnect');
       socket.off('doc:permission');
+      socket.off('error');
+      socket.off('doc:access-revoked');
       socket.off('doc:awareness');
       socket.off('doc:saved');
       socket.off('doc:typing');
@@ -1825,8 +1847,9 @@ export default function Editor({ docId }: { docId: string }) {
   }, [editor, canEditDoc]);
 
   const handleTitleBlur = useCallback(async () => {
+    if (!canEditDoc) return; // viewers can't rename — server would 403 anyway
     await api.patch(`/docs/${docId}`, { title }).catch(() => {});
-  }, [docId, title]);
+  }, [docId, title, canEditDoc]);
 
   // Initialize template content if present
   useEffect(() => {
@@ -2014,6 +2037,43 @@ export default function Editor({ docId }: { docId: string }) {
 
   const lastEdit = lastSaved || editedAt;
 
+  // Access refused / revoked — render a friendly screen instead of the editor.
+  if (joinError) {
+    const copy = {
+      unshared: {
+        icon: '🔗',
+        title: 'This document is no longer shared',
+        body: 'The owner has disabled link sharing. Ask them for access to keep viewing it.',
+      },
+      noaccess: {
+        icon: '🔒',
+        title: "You don't have access",
+        body: 'You don’t have permission to view this document. Ask the owner to share it with you.',
+      },
+      notfound: {
+        icon: '📄',
+        title: 'Document not found',
+        body: 'This document may have been deleted or the link is incorrect.',
+      },
+    }[joinError];
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-6">
+        <div className="max-w-[380px] w-full text-center anim-scale-in">
+          <div className="text-[40px] mb-3">{copy.icon}</div>
+          <h1 className="text-[20px] font-semibold text-[#1D1D1F] mb-2">{copy.title}</h1>
+          <p className="text-[14px] text-[#6E6E73] leading-relaxed mb-6">{copy.body}</p>
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard')}
+            className="inline-flex items-center gap-1.5 px-4 h-9 rounded-full bg-[#007AFF] hover:bg-[#0055D4] text-white text-[13px] font-semibold transition-colors"
+          >
+            Back to Docs
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
@@ -2037,7 +2097,8 @@ export default function Editor({ docId }: { docId: string }) {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 onBlur={handleTitleBlur}
-                className="w-full font-semibold text-[#1D1D1F] bg-transparent border-none outline-none text-[16px] truncate tracking-tight placeholder:text-[#AEAEB2]"
+                readOnly={!canEditDoc}
+                className={`w-full font-semibold text-[#1D1D1F] bg-transparent border-none outline-none text-[16px] truncate tracking-tight placeholder:text-[#AEAEB2] ${!canEditDoc ? 'cursor-default' : ''}`}
                 placeholder="Untitled"
               />
             </div>
@@ -2125,28 +2186,45 @@ export default function Editor({ docId }: { docId: string }) {
             </svg>
           </button>
 
-          {/* Share */}
-          <button
-            type="button"
-            onClick={() => setShareOpen(true)}
-            className="flex items-center gap-1.5 px-3 h-[26px] rounded-full bg-[#1D1D1F] hover:bg-[#3A3A3C] text-white text-[11px] font-semibold transition-colors duration-150 flex-shrink-0"
-          >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
-            <span className="hidden sm:inline">Share</span>
-          </button>
+          {/* Share — owners/editors only; viewers can't reshare */}
+          {canEditDoc && (
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
+              className="flex items-center gap-1.5 px-3 h-[26px] rounded-full bg-[#1D1D1F] hover:bg-[#3A3A3C] text-white text-[11px] font-semibold transition-colors duration-150 flex-shrink-0"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+              <span className="hidden sm:inline">Share</span>
+            </button>
+          )}
         </div>
-        <Toolbar
-          editor={editor}
-          onAiToggle={toggleAi}
-          onVersionsToggle={toggleVersions}
-          onCommentsToggle={toggleComments}
-          onImageUpload={() => fileInputRef.current?.click()}
-          commentCount={commentCount}
-          suggestionMode={suggestionMode}
-          onSuggestionToggle={() => setSuggestionMode(!suggestionMode)}
-          onAcceptAll={acceptAllSuggestions}
-          onRejectAll={rejectAllSuggestions}
-        />
+        {/* Editing toolbar is hidden entirely in view-only mode (Google-Docs
+            style); the read-only banner replaces it. */}
+        {canEditDoc ? (
+          <Toolbar
+            editor={editor}
+            onAiToggle={toggleAi}
+            onVersionsToggle={toggleVersions}
+            onCommentsToggle={toggleComments}
+            onImageUpload={() => fileInputRef.current?.click()}
+            commentCount={commentCount}
+            suggestionMode={suggestionMode}
+            onSuggestionToggle={() => setSuggestionMode(!suggestionMode)}
+            onAcceptAll={acceptAllSuggestions}
+            onRejectAll={rejectAllSuggestions}
+          />
+        ) : (
+          <div className="flex items-center gap-2 px-4 py-2 border-t border-[rgba(0,0,0,0.07)] bg-[#FFF8E6] text-[#8A6D00]">
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            <span className="text-[13px] font-semibold">View only</span>
+            <span className="hidden sm:inline text-[12px] text-[#B8860B]">
+              · Editing is disabled by the document owner. You can read, select, and copy.
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Hidden file input backing the toolbar / slash-menu image upload */}
@@ -2178,6 +2256,8 @@ export default function Editor({ docId }: { docId: string }) {
                 editor={editor}
                 tippyOptions={{ duration: 100, placement: 'top-start' }}
                 shouldShow={({ state }) => {
+                  // No editing affordances in view-only mode.
+                  if (!canEditDoc) return false;
                   // Text formatting only — never over a selected image/atom node,
                   // which owns its own floating toolbar in the NodeView.
                   if ((state.selection as any).node) return false;
