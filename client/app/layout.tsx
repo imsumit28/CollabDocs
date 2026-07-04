@@ -20,11 +20,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
-      { url: '/favicon.png', type: 'image/png', sizes: '64x64' },
+      { url: '/favicon.svg?v=2', type: 'image/svg+xml' },
+      { url: '/favicon.png?v=2', type: 'image/png', sizes: '256x256' },
     ],
-    apple: '/favicon.png',
-    shortcut: '/favicon.png',
+    apple: '/favicon.png?v=2',
+    shortcut: '/favicon.png?v=2',
   },
   appleWebApp: {
     capable: true,
