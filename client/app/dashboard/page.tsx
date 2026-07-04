@@ -220,7 +220,9 @@ function ShareModal({ doc, onClose, toast, currentUserId }: { doc: Doc; onClose:
   // People with access (collaborators invited by email) — mirrors the editor's
   // Share modal so owners can manage access without opening the document.
   const isOwner = doc.ownerId?.toString() === currentUserId?.toString();
+  interface Pending { email: string; permission: 'view' | 'edit'; }
   const [people, setPeople] = useState<Person[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<Pending[]>([]);
   const [ownerInfo, setOwnerInfo] = useState<{ userId: string; displayName: string | null; email: string | null } | null>(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [invitePerm, setInvitePerm] = useState<'view' | 'edit'>('view');
@@ -231,6 +233,7 @@ function ShareModal({ doc, onClose, toast, currentUserId }: { doc: Doc; onClose:
     api.get(`/docs/${doc._id}/collaborators`)
       .then((res) => {
         setPeople(res.data.collaborators || []);
+        setPendingInvites(res.data.pendingInvites || []);
         setOwnerInfo(res.data.owner || null);
       })
       .catch(() => { /* non-fatal — link sharing still works */ });
@@ -243,8 +246,12 @@ function ShareModal({ doc, onClose, toast, currentUserId }: { doc: Doc; onClose:
     try {
       const res = await api.post(`/docs/${doc._id}/collaborators`, { email: inviteEmail.trim(), permission: invitePerm });
       setPeople(res.data.collaborators || []);
+      setPendingInvites(res.data.pendingInvites || []);
+      const stillPending = (res.data.pendingInvites || []).some(
+        (p: Pending) => p.email === inviteEmail.trim().toLowerCase()
+      );
       setInviteEmail('');
-      toast.success('Invitation added');
+      toast.success(stillPending ? 'Invitation emailed — they can join with this address' : 'Invitation sent');
     } catch (err: any) {
       setInviteError(err.response?.data?.error || 'Could not add that person');
     } finally { setInviteLoading(false); }
@@ -255,6 +262,7 @@ function ShareModal({ doc, onClose, toast, currentUserId }: { doc: Doc; onClose:
     try {
       const res = await api.post(`/docs/${doc._id}/collaborators`, { email, permission: perm });
       setPeople(res.data.collaborators || []);
+      setPendingInvites(res.data.pendingInvites || []);
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Could not update permission');
     }
@@ -264,9 +272,20 @@ function ShareModal({ doc, onClose, toast, currentUserId }: { doc: Doc; onClose:
     try {
       const res = await api.delete(`/docs/${doc._id}/collaborators/${userId}`);
       setPeople(res.data.collaborators || []);
+      setPendingInvites(res.data.pendingInvites || []);
       toast.success('Removed');
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Could not remove person');
+    }
+  };
+
+  const removePendingInvite = async (email: string) => {
+    try {
+      const res = await api.delete(`/docs/${doc._id}/invites`, { data: { email } });
+      setPendingInvites(res.data.pendingInvites || []);
+      toast.success('Invitation revoked');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Could not revoke invitation');
     }
   };
 
@@ -415,7 +434,38 @@ function ShareModal({ doc, onClose, toast, currentUserId }: { doc: Doc; onClose:
               </div>
             ))}
 
-            {people.length === 0 && !ownerInfo && (
+            {/* Pending invites — addresses without an account yet */}
+            {pendingInvites.map((p) => (
+              <div key={`pending-${p.email}`} className="flex items-center gap-2.5 py-1.5">
+                <div className="w-7 h-7 rounded-full bg-[#E5E7EB] text-[#8E8E93] flex items-center justify-center flex-shrink-0">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-[#1D1D1F] truncate">{p.email}</p>
+                  <p className="text-[11px] text-[#B8860B] truncate">Pending — invitation emailed</p>
+                </div>
+                {isOwner ? (
+                  <>
+                    <select
+                      value={p.permission}
+                      onChange={(e) => changePersonPermission(p.email, e.target.value as 'view' | 'edit')}
+                      aria-label={`Permission for ${p.email}`}
+                      className="text-[12px] rounded-[6px] border border-[rgba(0,0,0,0.12)] px-1.5 py-1 bg-white text-[#3A3A3C] flex-shrink-0"
+                    >
+                      <option value="view">Can view</option>
+                      <option value="edit">Can edit</option>
+                    </select>
+                    <button type="button" onClick={() => removePendingInvite(p.email)} aria-label={`Revoke invitation for ${p.email}`} className="text-[#8E8E93] hover:text-[#FF3B30] flex-shrink-0 p-1">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </>
+                ) : (
+                  <span className="text-[12px] text-[#8E8E93] flex-shrink-0">Pending</span>
+                )}
+              </div>
+            ))}
+
+            {people.length === 0 && pendingInvites.length === 0 && !ownerInfo && (
               <p className="text-[12px] text-[#8E8E93] py-1">No one else has access yet.</p>
             )}
           </div>

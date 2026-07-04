@@ -17,6 +17,7 @@ import {
 import { signupRateLimit, authRateLimit, resendVerificationRateLimit, forgotPasswordRateLimit, verifyOtpRateLimit, resendOtpRateLimit, resetPasswordRateLimit } from '../middleware/rateLimit';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { sendVerificationEmail, sendPasswordResetOtpEmail, sendOAuthResetNoticeEmail } from '../utils/mailer';
+import { claimPendingInvites } from '../utils/pendingInvites';
 import { validateEmail, validatePassword, validateOtp, validateDisplayName, validateAvatarUrl, firstError } from '../utils/validation';
 
 const envCandidates = [
@@ -86,6 +87,11 @@ passport.use(
         let user = await User.findOne({ oauthId: profile.id });
         if (!user) user = await User.findOne({ email });
 
+        // Whether this sign-in is the first time we can trust the address —
+        // either a brand-new account or one that just linked Google (which
+        // verifies the email). Those are the moments to claim queued invites.
+        let justProvenOwnership = false;
+
         if (!user) {
           user = await User.create({
             email,
@@ -97,11 +103,18 @@ passport.use(
             avatarUrl: profile.photos?.[0].value || null,
             emailVerified: true, // Google already verified this address
           });
+          justProvenOwnership = true;
         } else if (!user.oauthId) {
           user.oauthId = profile.id;
           user.oauthProvider = 'google';
+          const wasUnverified = !user.emailVerified;
           user.emailVerified = true;
           await user.save();
+          if (wasUnverified) justProvenOwnership = true;
+        }
+
+        if (justProvenOwnership) {
+          await claimPendingInvites(user.id, user.email);
         }
 
         return done(null, user);
@@ -367,6 +380,9 @@ router.get('/verify-email/:token', async (req: Request, res: Response) => {
     user.emailVerificationToken = null;
     user.emailVerificationExpiry = null;
     await user.save();
+
+    // Ownership of this address is now proven — grant any invites queued for it.
+    await claimPendingInvites(user.id, user.email);
 
     res.redirect(`${clientUrl}/login?verified=1`);
   } catch {

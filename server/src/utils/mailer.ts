@@ -310,15 +310,20 @@ export async function sendOAuthResetNoticeEmail(to: string, displayName?: string
 function renderShareInviteHtml(opts: {
   inviterName: string;
   documentTitle: string;
-  docUrl: string;
+  ctaUrl: string;
   canEdit: boolean;
   greetingName: string;
+  newUser: boolean;
 }): string {
   const accessLabel = opts.canEdit ? 'Can edit' : 'Can view';
   const verb = opts.canEdit ? 'edit' : 'view';
   // Escape the title/name — they're user-controlled and land inside HTML.
   const title = escapeHtml(opts.documentTitle);
   const inviter = escapeHtml(opts.inviterName);
+  const buttonLabel = opts.newUser ? 'Create your free account' : 'Open document';
+  const helper = opts.newUser
+    ? `Create a free CollabDocs account with <strong style="color:#0f172a;">${escapeHtml(opts.greetingName)}@…</strong> — this exact email address — and the document will be waiting for you.`
+    : '';
 
   const content = `
           <tr>
@@ -335,9 +340,10 @@ function renderShareInviteHtml(opts: {
           </tr>
           <tr>
             <td align="center" style="padding:0 32px 28px 32px;">
-              <a href="${opts.docUrl}" style="display:inline-block;background-color:#0f172a;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:13px 30px;border-radius:10px;">Open document</a>
+              <a href="${opts.ctaUrl}" style="display:inline-block;background-color:#0f172a;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:13px 30px;border-radius:10px;">${buttonLabel}</a>
             </td>
           </tr>
+          ${helper ? `<tr><td align="center" style="padding:0 32px 24px 32px;"><p style="margin:0;font-size:13px;color:#64748b;line-height:1.6;">${helper}</p></td></tr>` : ''}
           <tr><td style="padding:0 32px;"><div style="border-top:1px solid #eef2f7;"></div></td></tr>
           <tr>
             <td style="padding:20px 32px 32px 32px;">
@@ -345,7 +351,7 @@ function renderShareInviteHtml(opts: {
                 If the button doesn't work, copy and paste this link into your browser:
               </p>
               <p style="margin:0;font-size:12px;color:#64748b;word-break:break-all;">
-                <a href="${opts.docUrl}" style="color:#2563eb;text-decoration:underline;">${opts.docUrl}</a>
+                <a href="${opts.ctaUrl}" style="color:#2563eb;text-decoration:underline;">${opts.ctaUrl}</a>
               </p>
               <p style="margin:16px 0 0 0;font-size:13px;color:#94a3b8;line-height:1.6;">
                 If you weren't expecting this, you can safely ignore this email.
@@ -363,31 +369,51 @@ function renderShareInviteHtml(opts: {
 // Notify a person that a document was shared with them, via a real email (in
 // addition to the in-app notification). Best-effort at the call site: a delivery
 // failure must not fail the share itself, which is already persisted.
+//
+// `newUser` = the address has no CollabDocs account yet (a pending invite): the
+// email nudges them to sign up with that exact address so the queued invite is
+// claimed on verification, and the CTA points at signup rather than the doc.
 export async function sendShareInviteEmail(opts: {
   to: string;
   inviterName: string;
   documentTitle: string;
   documentId: string;
   permission: 'view' | 'edit';
+  newUser?: boolean;
 }): Promise<void> {
   const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
   const docUrl = `${clientUrl}/doc/${opts.documentId}`;
+  const signupUrl = `${clientUrl}/signup?email=${encodeURIComponent(opts.to)}`;
+  const ctaUrl = opts.newUser ? signupUrl : docUrl;
   const greetingName = opts.to.split('@')[0];
   const title = opts.documentTitle || 'Untitled';
   const canEdit = opts.permission === 'edit';
   const verb = canEdit ? 'edit' : 'view';
 
+  const text = opts.newUser
+    ? `Hello ${greetingName},\n\n` +
+      `${opts.inviterName} invited you to ${verb} the document "${title}" on CollabDocs.\n\n` +
+      `Create a free account with this email address (${opts.to}) to access it:\n${signupUrl}\n\n` +
+      `If you weren't expecting this, you can safely ignore this email.`
+    : `Hello ${greetingName},\n\n` +
+      `${opts.inviterName} invited you to ${verb} the document "${title}" on CollabDocs.\n\n` +
+      `Open it here:\n${docUrl}\n\n` +
+      `If you weren't expecting this, you can safely ignore this email.`;
+
   try {
     await dispatchEmail({
       to: opts.to,
       subject: `${opts.inviterName} shared "${title}" with you`,
-      text:
-        `Hello ${greetingName},\n\n` +
-        `${opts.inviterName} invited you to ${verb} the document "${title}" on CollabDocs.\n\n` +
-        `Open it here:\n${docUrl}\n\n` +
-        `If you weren't expecting this, you can safely ignore this email.`,
-      html: renderShareInviteHtml({ inviterName: opts.inviterName, documentTitle: title, docUrl, canEdit, greetingName }),
-      devLog: { docUrl, permission: opts.permission },
+      text,
+      html: renderShareInviteHtml({
+        inviterName: opts.inviterName,
+        documentTitle: title,
+        ctaUrl,
+        canEdit,
+        greetingName,
+        newUser: !!opts.newUser,
+      }),
+      devLog: { ctaUrl, permission: opts.permission, newUser: !!opts.newUser },
     });
   } catch (err) {
     logger.error({ to: opts.to, err: (err as Error).message }, '[mailer] FAILED to send share invite');

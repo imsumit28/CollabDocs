@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { CollabDocument, User, Folder, IDocument } from '../models';
+import { CollabDocument, User, Folder, PendingInvite, IDocument } from '../models';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { validateTitle, validateEmail, validateShareLinkPermission, isValidObjectId } from '../utils/validation';
 import { notifyShare } from '../utils/notifications';
@@ -24,6 +24,12 @@ async function buildCollaboratorList(doc: IDocument) {
       permission: c.permission,
     };
   });
+}
+
+// Outstanding email invitations to addresses without an account yet.
+async function buildPendingInviteList(doc: IDocument) {
+  const invites = await PendingInvite.find({ documentId: doc._id }).sort({ createdAt: 1 }).lean();
+  return invites.map((i) => ({ email: i.email, permission: i.permission }));
 }
 
 const router = Router();
@@ -216,6 +222,8 @@ router.delete('/:id/permanent', async (req: AuthRequest, res: Response) => {
   if (doc.ownerId.toString() !== req.user!.sub) { res.status(403).json({ error: 'Only owner can delete permanently' }); return; }
 
   await doc.deleteOne();
+  // Drop any outstanding invites for the now-gone document.
+  await PendingInvite.deleteMany({ documentId: doc._id });
   res.json({ message: 'Document permanently deleted' });
 });
 
@@ -317,6 +325,7 @@ router.get('/:id/collaborators', async (req: AuthRequest, res: Response) => {
       ? { userId: doc.ownerId.toString(), email: owner.email, displayName: owner.displayName, avatarUrl: owner.avatarUrl ?? null }
       : null,
     collaborators: await buildCollaboratorList(doc),
+    pendingInvites: await buildPendingInviteList(doc),
   });
 });
 
@@ -331,8 +340,45 @@ router.post('/:id/collaborators', async (req: AuthRequest, res: Response) => {
   if (emailError) { res.status(400).json({ error: emailError.message }); return; }
   if (!validateShareLinkPermission(permission)) { res.status(400).json({ error: 'Permission must be "view" or "edit"' }); return; }
 
-  const invitee = await User.findOne({ email: email.toLowerCase().trim() });
-  if (!invitee) { res.status(404).json({ error: 'No CollabDocs user found with that email' }); return; }
+  const normalizedEmail = email.toLowerCase().trim();
+  const invitee = await User.findOne({ email: normalizedEmail });
+
+  // No account yet → queue a pending invite that's claimed when they verify that
+  // address (signup) or sign in with Google. An email nudges them to join.
+  if (!invitee) {
+    await PendingInvite.findOneAndUpdate(
+      { documentId: doc._id, email: normalizedEmail },
+      {
+        documentId: doc._id,
+        email: normalizedEmail,
+        permission,
+        invitedBy: req.user!.sub,
+        invitedByName: req.user!.displayName,
+        documentTitle: doc.title,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    try {
+      await sendShareInviteEmail({
+        to: normalizedEmail,
+        inviterName: req.user!.displayName,
+        documentTitle: doc.title,
+        documentId: doc.id,
+        permission,
+        newUser: true,
+      });
+    } catch {
+      /* failure already logged in the mailer */
+    }
+
+    res.status(201).json({
+      collaborators: await buildCollaboratorList(doc),
+      pendingInvites: await buildPendingInviteList(doc),
+    });
+    return;
+  }
+
   if (invitee.id === doc.ownerId.toString()) { res.status(400).json({ error: 'You already own this document' }); return; }
 
   const existing = doc.collaborators.findIndex((c) => c.userId.toString() === invitee.id);
@@ -374,7 +420,25 @@ router.post('/:id/collaborators', async (req: AuthRequest, res: Response) => {
     }
   }
 
-  res.status(201).json({ collaborators: await buildCollaboratorList(doc) });
+  res.status(201).json({
+    collaborators: await buildCollaboratorList(doc),
+    pendingInvites: await buildPendingInviteList(doc),
+  });
+});
+
+// ─── Revoke a pending (not-yet-claimed) email invite (owner only) ─────────────
+router.delete('/:id/invites', async (req: AuthRequest, res: Response) => {
+  const doc = await CollabDocument.findById(req.params.id);
+  if (!doc) { res.status(404).json({ error: 'Not found' }); return; }
+  if (doc.ownerId.toString() !== req.user!.sub) { res.status(403).json({ error: 'Only owner can manage collaborators' }); return; }
+
+  const email = typeof req.body?.email === 'string' ? req.body.email.toLowerCase().trim() : '';
+  if (!email) { res.status(400).json({ error: 'email is required' }); return; }
+
+  const result = await PendingInvite.deleteOne({ documentId: doc._id, email });
+  if (result.deletedCount === 0) { res.status(404).json({ error: 'Pending invite not found' }); return; }
+
+  res.json({ pendingInvites: await buildPendingInviteList(doc) });
 });
 
 // ─── Remove a collaborator (owner only) ───────────────────────────────────────
@@ -395,7 +459,10 @@ router.delete('/:id/collaborators/:userId', async (req: AuthRequest, res: Respon
   // still covers them), so re-evaluate the room.
   await refreshDocPermissions(doc.id);
 
-  res.json({ collaborators: await buildCollaboratorList(doc) });
+  res.json({
+    collaborators: await buildCollaboratorList(doc),
+    pendingInvites: await buildPendingInviteList(doc),
+  });
 });
 
 export default router;

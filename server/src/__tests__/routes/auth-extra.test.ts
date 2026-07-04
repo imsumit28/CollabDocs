@@ -3,7 +3,7 @@ import express, { Express } from 'express';
 import crypto from 'crypto';
 import cookieParser from 'cookie-parser';
 import authRoutes from '../../routes/auth';
-import { User } from '../../models';
+import { User, CollabDocument, PendingInvite } from '../../models';
 import { createTestUser, generateAccessToken } from '../helpers';
 
 // Mailer is mocked so nothing is actually sent; we assert it was invoked.
@@ -55,6 +55,29 @@ describe('Auth Routes — email verification', () => {
       const user = await User.findOne({ email: 'verify@example.com' });
       expect(user!.emailVerified).toBe(true);
       expect(user!.emailVerificationToken).toBeNull();
+    });
+
+    it('claims a pending share invite for the address on verification', async () => {
+      const raw = 'b'.repeat(64);
+      const user = await seedUnverified(raw, new Date(Date.now() + 60_000));
+      const owner = await User.create({ email: 'owner@example.com', displayName: 'Owner', passwordHash: 'x' });
+      const doc = await CollabDocument.create({ title: 'Shared', ownerId: owner._id });
+      await PendingInvite.create({
+        documentId: doc._id,
+        email: 'verify@example.com',
+        permission: 'edit',
+        invitedBy: owner._id,
+        invitedByName: 'Owner',
+        documentTitle: 'Shared',
+      });
+
+      await request(app).get(`/api/auth/verify-email/${raw}`);
+
+      const updated = await CollabDocument.findById(doc._id).lean();
+      expect(updated?.collaborators).toHaveLength(1);
+      expect(updated?.collaborators[0].userId.toString()).toBe(user.id);
+      expect(updated?.collaborators[0].permission).toBe('edit');
+      expect(await PendingInvite.countDocuments({ email: 'verify@example.com' })).toBe(0);
     });
 
     it('redirects with an error for an unknown token', async () => {

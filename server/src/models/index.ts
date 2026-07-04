@@ -123,6 +123,39 @@ const DocumentSchema = new Schema<IDocument>(
 
 export const CollabDocument = mongoose.model<IDocument>('Document', DocumentSchema);
 
+// ─── PendingInvite ──────────────────────────────────────────────────────────────
+// A share invitation to an email address that has no CollabDocs account yet.
+// It's "claimed" (converted into a real collaborator) once someone proves they
+// own that address — by verifying it (password signup) or via Google OAuth.
+export interface IPendingInvite extends MongoDoc {
+  documentId: Types.ObjectId;
+  email: string;
+  permission: 'view' | 'edit';
+  invitedBy: Types.ObjectId;
+  invitedByName: string;
+  documentTitle: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const PendingInviteSchema = new Schema<IPendingInvite>(
+  {
+    documentId: { type: Schema.Types.ObjectId, ref: 'Document', required: true, index: true },
+    email: { type: String, required: true, lowercase: true, trim: true, index: true },
+    permission: { type: String, enum: ['view', 'edit'], default: 'view' },
+    invitedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    invitedByName: { type: String, default: '' },
+    documentTitle: { type: String, default: 'Untitled' },
+  },
+  { timestamps: true }
+);
+
+// One pending invite per (document, email): re-inviting the same address just
+// updates the permission instead of stacking duplicates.
+PendingInviteSchema.index({ documentId: 1, email: 1 }, { unique: true });
+
+export const PendingInvite = mongoose.model<IPendingInvite>('PendingInvite', PendingInviteSchema);
+
 // ─── Version ──────────────────────────────────────────────────────────────────
 export interface IVersion extends MongoDoc {
   documentId: Types.ObjectId;

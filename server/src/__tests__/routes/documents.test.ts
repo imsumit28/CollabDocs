@@ -431,9 +431,44 @@ describe('Document Routes', () => {
       expect(res.body.collaborators[0].permission).toBe('edit');
     });
 
-    it('404 when no user has that email', async () => {
-      const res = await request(app).post(`/api/docs/${docId}/collaborators`).set(ownerAuth()).send({ email: 'ghost@example.com' });
+    it('queues a pending invite (and emails) when no user has that email', async () => {
+      const res = await request(app)
+        .post(`/api/docs/${docId}/collaborators`)
+        .set(ownerAuth())
+        .send({ email: 'ghost@example.com', permission: 'edit' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.collaborators).toHaveLength(0);
+      expect(res.body.pendingInvites).toEqual([{ email: 'ghost@example.com', permission: 'edit' }]);
+      // The invite email is sent with the new-user (signup) variant.
+      expect(sendShareInviteEmail as jest.Mock).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'ghost@example.com', permission: 'edit', newUser: true }),
+      );
+    });
+
+    it('re-inviting a pending email updates its permission without duplicating', async () => {
+      await request(app).post(`/api/docs/${docId}/collaborators`).set(ownerAuth()).send({ email: 'ghost@example.com', permission: 'view' });
+      const res = await request(app).post(`/api/docs/${docId}/collaborators`).set(ownerAuth()).send({ email: 'ghost@example.com', permission: 'edit' });
+      expect(res.body.pendingInvites).toEqual([{ email: 'ghost@example.com', permission: 'edit' }]);
+    });
+
+    it('revokes a pending invite', async () => {
+      await request(app).post(`/api/docs/${docId}/collaborators`).set(ownerAuth()).send({ email: 'ghost@example.com', permission: 'view' });
+      const res = await request(app).delete(`/api/docs/${docId}/invites`).set(ownerAuth()).send({ email: 'ghost@example.com' });
+      expect(res.status).toBe(200);
+      expect(res.body.pendingInvites).toHaveLength(0);
+    });
+
+    it('404 when revoking a pending invite that does not exist', async () => {
+      const res = await request(app).delete(`/api/docs/${docId}/invites`).set(ownerAuth()).send({ email: 'nobody@example.com' });
       expect(res.status).toBe(404);
+    });
+
+    it('403 when a non-owner revokes a pending invite', async () => {
+      await request(app).post(`/api/docs/${docId}/collaborators`).set(ownerAuth()).send({ email: 'ghost@example.com', permission: 'view' });
+      const stranger = generateAccessToken(inviteeId);
+      const res = await request(app).delete(`/api/docs/${docId}/invites`).set({ Authorization: `Bearer ${stranger}` }).send({ email: 'ghost@example.com' });
+      expect(res.status).toBe(403);
     });
 
     it('400 for a malformed email', async () => {

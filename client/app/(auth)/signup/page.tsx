@@ -388,6 +388,13 @@ export default function SignupPage() {
     }
   }, [step]);
 
+  // Prefill the email when arriving from a share invitation (…/signup?email=…),
+  // so the address the invite was sent to is the one they register with.
+  useEffect(() => {
+    const invited = new URLSearchParams(window.location.search).get('email');
+    if (invited) setEmail(invited);
+  }, []);
+
   async function handleAccountSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
