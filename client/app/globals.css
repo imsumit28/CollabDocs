@@ -190,6 +190,29 @@ body {
   min-height: 540px;
   color: var(--apple-text-primary);
   caret-color: var(--brand);
+  /* Long words / URLs must wrap instead of forcing horizontal scroll on phones */
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Wide tables scroll horizontally within the column rather than overflowing the
+   page — TipTap wraps every table in .tableWrapper. */
+.ProseMirror .tableWrapper { overflow-x: auto; }
+
+/* ─── Editor content: small-screen tuning ─────────────────────────────────── */
+@media (max-width: 639px) {
+  .ProseMirror { min-height: 360px; }
+  .ProseMirror h1 { font-size: 1.6rem; margin: 1.1rem 0 0.6rem; }
+  .ProseMirror h2 { font-size: 1.3rem; margin: 0.9rem 0 0.5rem; }
+  .ProseMirror h3 { font-size: 1.1rem; margin: 0.8rem 0 0.4rem; }
+  .ProseMirror pre { padding: 0.75rem; }
+  /* Floated images can't sit beside text on a narrow column — stack them */
+  .ProseMirror .image-node[data-wrap="left"],
+  .ProseMirror .image-node[data-wrap="right"] {
+    float: none;
+    margin: 0.6rem 0;
+    max-width: 100%;
+  }
 }
 
 /* View-only mode: no text caret, default cursor over content and images so the

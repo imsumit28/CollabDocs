@@ -1611,7 +1611,7 @@ function OutlineSidebar({ editor }: { editor: any }) {
 function PresenceBar({ onlineUsers, typingUsers }: { onlineUsers: any[]; typingUsers: Set<string> }) {
   if (onlineUsers.length === 0) return null;
   return (
-    <div className="flex items-center gap-2 px-5 py-2.5 border-b border-[rgba(0,0,0,0.04)] bg-[#FBFBFD] min-h-[44px] anim-fade-in">
+    <div className="flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 border-b border-[rgba(0,0,0,0.04)] bg-[#FBFBFD] min-h-[40px] sm:min-h-[44px] anim-fade-in">
       <span className="text-[10px] font-bold text-[#AEAEB2] uppercase tracking-[0.05em] flex-shrink-0">Live</span>
       <div className="flex items-center gap-2 flex-wrap">
         {onlineUsers.map((u) => {
@@ -2130,7 +2130,7 @@ export default function Editor({ docId }: { docId: string }) {
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
       <div className="apple-glass border-b border-[rgba(0,0,0,0.08)] sticky top-0 z-10">
-        <div className="flex items-center gap-3 px-4 py-2">
+        <div className="flex items-center gap-1.5 sm:gap-3 px-3 sm:px-4 py-2">
           <button type="button" onClick={() => router.push('/dashboard')} className="flex items-center gap-1.5 text-[#007AFF] hover:text-[#0055D4] text-[13px] font-semibold transition-colors flex-shrink-0">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
@@ -2207,7 +2207,7 @@ export default function Editor({ docId }: { docId: string }) {
             type="button"
             title={fullWidth ? 'Focused width' : 'Full width'}
             onClick={toggleFullWidth}
-            className={`w-7 h-7 flex items-center justify-center rounded-full transition-all duration-150 flex-shrink-0 ${
+            className={`w-7 h-7 hidden sm:flex items-center justify-center rounded-full transition-all duration-150 flex-shrink-0 ${
               fullWidth ? 'text-[#007AFF] bg-[#007AFF]/10' : 'text-[#AEAEB2] hover:text-[#1D1D1F] hover:bg-[#F5F5F7]'
             }`}
           >
@@ -2302,7 +2302,7 @@ export default function Editor({ docId }: { docId: string }) {
             }
           }}
         >
-          <div className={`mx-auto px-4 sm:px-8 py-8 sm:py-14 anim-slide-up transition-[max-width] duration-200 ${fullWidth ? 'max-w-none' : 'max-w-[720px]'}`}>
+          <div className={`mx-auto px-4 sm:px-8 py-6 sm:py-14 anim-slide-up transition-[max-width] duration-200 ${fullWidth ? 'max-w-none' : 'max-w-[720px]'}`}>
             {editor && (
               <BubbleMenu
                 editor={editor}
