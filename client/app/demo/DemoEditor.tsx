@@ -16,10 +16,6 @@ const CURSOR_PATHS = [
   { top: 250, left: 200 },
 ];
 const DEMO_TITLE = 'Project Roadmap 2026';
-const DEMO_DRAFT = `Q1 Goals:
-- Improve collaboration latency
-- Add AI summarization
-- Improve export system`;
 const DEMO_IMPROVED = `Q1 Goals:
 - Reduce collaboration latency across every workspace
 - Ship AI summaries for meetings, notes, and roadmap updates
@@ -91,7 +87,7 @@ export default function DemoEditor() {
           <div className="relative order-1 mx-auto w-full max-w-3xl lg:order-2">
             <FakeNotification toasts={timeline.toasts} />
             <div
-              className={`demo-css-join absolute right-8 top-14 z-50 flex items-center gap-2 rounded-lg border border-emerald-300/20 bg-emerald-300/15 px-3 py-2 text-[13px] font-semibold text-emerald-100 shadow-2xl shadow-emerald-950/30 backdrop-blur-xl transition-all duration-500 ${
+              className={`absolute right-8 top-14 z-50 flex items-center gap-2 rounded-lg border border-emerald-300/20 bg-emerald-300/15 px-3 py-2 text-[13px] font-semibold text-emerald-100 shadow-2xl shadow-emerald-950/30 backdrop-blur-xl transition-all duration-500 ${
                 timeline.collaboratorJoined ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0'
               }`}
             >
@@ -112,10 +108,10 @@ export default function DemoEditor() {
                 </div>
                 <div className="flex -space-x-2">
                   <PresenceAvatar initials="SK" color="#3b82f6" />
-                  <div className={`demo-css-avatar ${timeline.collaboratorJoined ? 'opacity-100' : 'opacity-0'}`}>
+                  <div className={`transition-opacity duration-500 ${timeline.collaboratorJoined ? 'opacity-100' : 'opacity-0'}`}>
                     <PresenceAvatar initials="A" color="#10b981" delay={260} />
                   </div>
-                  <div className={`demo-css-avatar-late ${timeline.secondCursor ? 'opacity-100' : 'opacity-0'}`}>
+                  <div className={`transition-opacity duration-500 ${timeline.secondCursor ? 'opacity-100' : 'opacity-0'}`}>
                     <PresenceAvatar initials="P" color="#ec4899" delay={520} />
                   </div>
                 </div>
@@ -160,15 +156,15 @@ export default function DemoEditor() {
                   </div>
 
                   <h2 className="min-h-[45px] text-[34px] font-extrabold leading-tight tracking-[-0.03em] text-slate-950">
-                    <span className="demo-type-title">{timeline.typedTitle || DEMO_TITLE}</span>
+                    <span>{timeline.typedTitle}</span>
                     {timeline.typedTitle.length < DEMO_TITLE.length && <span className="ml-1 inline-block h-8 w-0.5 translate-y-1 bg-cyan-500 animate-pulse" />}
                   </h2>
 
                   <div className="relative mt-8 font-mono text-[15px] leading-8 text-slate-700">
-                    <div className={`demo-css-selection absolute left-0 top-[30px] h-[34px] w-[360px] rounded bg-cyan-200/55 transition-all duration-300 ${timeline.selectionVisible ? 'opacity-100' : 'opacity-0'}`} />
-                    <div className={`demo-css-comment-highlight absolute left-0 top-[95px] h-[30px] w-[330px] rounded bg-amber-200/70 ring-2 ring-amber-300/70 ${timeline.commentVisible ? 'opacity-100' : 'opacity-0'}`} />
-                    <pre className={`demo-type-draft relative whitespace-pre-wrap font-mono ${timeline.improved ? 'opacity-0' : ''}`}>
-                      {timeline.typedBody || DEMO_DRAFT}
+                    <div className={`absolute left-0 top-[30px] h-[34px] w-[360px] rounded bg-cyan-200/55 transition-all duration-300 ${timeline.selectionVisible ? 'opacity-100' : 'opacity-0'}`} />
+                    <div className={`absolute left-0 top-[95px] h-[30px] w-[330px] rounded bg-amber-200/70 ring-2 ring-amber-300/70 transition-opacity duration-300 ${timeline.commentVisible ? 'opacity-100' : 'opacity-0'}`} />
+                    <pre className={`demo-type-draft relative min-h-[128px] whitespace-pre-wrap font-mono ${timeline.improved ? 'opacity-0' : ''}`}>
+                      {timeline.typedBody}
                     </pre>
                     {timeline.improved && (
                       <pre className="absolute left-0 top-0 whitespace-pre-wrap font-mono opacity-100 transition-opacity duration-500">
@@ -185,18 +181,9 @@ export default function DemoEditor() {
                 </div>
 
                 <FakeCursor color="#3b82f6" name="Sumit" visible position={{ top: 214, left: 138 }} label="You" mode="caret" />
-                <FakeCursor color="#ec4899" name="Priya" visible={timeline.secondCursor} position={cursorPosition} className="demo-css-cursor-priya" mode="pointer" />
-                <FakeComment visible={timeline.commentVisible} className="demo-css-comment" />
-                <FakeToolbar visible={timeline.toolbarVisible} clicked={timeline.toolbarClicked} className="demo-css-toolbar" />
-
-                <div className="demo-css-fallback-toasts pointer-events-none absolute right-4 top-16 z-[70] w-[280px] space-y-2 opacity-0">
-                  {['AI suggestion applied', 'Changes synced', 'Export ready'].map((message) => (
-                    <div key={message} className="flex items-center gap-3 rounded-lg border border-white/15 bg-white/95 px-3 py-2.5 text-slate-950 shadow-2xl shadow-slate-950/25">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-black text-emerald-600">OK</span>
-                      <p className="text-[13px] font-semibold">{message}</p>
-                    </div>
-                  ))}
-                </div>
+                <FakeCursor color="#ec4899" name="Priya" visible={timeline.secondCursor} position={cursorPosition} mode="pointer" />
+                <FakeComment visible={timeline.commentVisible} />
+                <FakeToolbar visible={timeline.toolbarVisible} clicked={timeline.toolbarClicked} />
 
                 <div className="absolute bottom-7 right-7 z-40">
                   <div className="relative">
@@ -211,7 +198,7 @@ export default function DemoEditor() {
                       <ChevronDown size={14} />
                     </button>
                     <div
-                      className={`demo-css-export-menu absolute bottom-12 right-0 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-[13px] font-semibold text-slate-700 shadow-2xl transition-all duration-300 ${
+                      className={`absolute bottom-12 right-0 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-[13px] font-semibold text-slate-700 shadow-2xl transition-all duration-300 ${
                         timeline.exportOpen ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
                       }`}
                     >
@@ -242,12 +229,6 @@ export default function DemoEditor() {
                     </div>
                   </div>
                 )}
-                <div className="demo-css-export-modal absolute inset-0 z-[60] flex items-center justify-center bg-slate-950/35 opacity-0 backdrop-blur-sm">
-                  <div className="rounded-lg border border-white/20 bg-white px-7 py-6 text-center text-slate-950 shadow-2xl">
-                    <Loader2 className="demo-css-export-loader mx-auto mb-3 text-cyan-500" size={30} />
-                    <p className="text-[15px] font-bold">Exporting document...</p>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
