@@ -29,9 +29,9 @@ export default function TermsPage() {
             Terms of Service &amp; Privacy Policy
           </h1>
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[#6B7280]">
-            <span>Effective Date: April 28, 2026</span>
+            <span>Effective Date: July 9, 2026</span>
             <span className="text-[#D1D5DB]">•</span>
-            <span>Version 1.0</span>
+            <span>Version 1.1</span>
             <span className="text-[#D1D5DB]">•</span>
             <span>Student Project</span>
           </div>
@@ -53,7 +53,8 @@ export default function TermsPage() {
             <a href="#tos-5" className="text-[#6B7280] hover:text-[#111827]">5. Acceptable Use</a>
             <a href="#pp-4" className="text-[#6B7280] hover:text-[#111827]">4. Cookies &amp; Local Storage</a>
             <a href="#tos-6" className="text-[#6B7280] hover:text-[#111827]">6. Your Content</a>
-            <a href="#pp-7" className="text-[#6B7280] hover:text-[#111827]">7. Your Rights</a>
+            <a href="#pp-5" className="text-[#6B7280] hover:text-[#111827]">5. AI Features &amp; DeepSeek</a>
+            <a href="#pp-8" className="text-[#6B7280] hover:text-[#111827]">8. Your Rights</a>
             <a href="#contact" className="text-[#6B7280] hover:text-[#111827]">Contact</a>
           </div>
         </nav>
@@ -89,6 +90,7 @@ export default function TermsPage() {
                   'Create, edit, and save text documents',
                   'Collaborate with others on documents in real time',
                   'Share documents with other users via link or direct invite',
+                  'Use optional AI writing tools (improve, summarize, translate, and more)',
                   'Sign in using your Google account or email and password',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5 text-[14px] text-[#4B5563]">
@@ -145,7 +147,7 @@ export default function TermsPage() {
             <section>
               <h3 className="text-[16px] font-semibold text-[#111827] mb-2">8. Termination</h3>
               <p className="text-[14px] text-[#4B5563] leading-relaxed">
-                You can delete your account at any time. We may also suspend or terminate your account if you violate these terms. Upon termination, your documents may be deleted from our servers.
+                You can request deletion of your account at any time by contacting us at the email listed in the Privacy Policy. We may also suspend or terminate your account if you violate these terms. Upon termination, your documents may be deleted from our servers.
               </p>
             </section>
 
@@ -182,7 +184,7 @@ export default function TermsPage() {
                   'Account information: your name, email address, and profile picture (from Google OAuth or sign-up form)',
                   'Document data: the content of documents you create or collaborate on',
                   'Usage data: timestamps of logins, document edits, and sharing activity',
-                  'Device info: browser type and rough location (country/region) for security purposes',
+                  'AI inputs: text you choose to send to the optional AI writing tools (see section 5)',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5 text-[14px] text-[#4B5563]">
                     <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#3B82F6] flex-shrink-0" />
@@ -199,7 +201,7 @@ export default function TermsPage() {
                 {[
                   'Provide and operate the CollabDocs service',
                   'Enable real-time collaboration features',
-                  'Send account-related emails (e.g., password reset, login alerts)',
+                  'Send account-related emails (e.g., email verification, password reset, and document share invites)',
                   'Improve the platform based on how it is used',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5 text-[14px] text-[#4B5563]">
@@ -223,8 +225,8 @@ export default function TermsPage() {
               <p className="text-[14px] text-[#4B5563] leading-relaxed mb-3">CollabDocs uses:</p>
               <ul className="space-y-2 mb-3">
                 {[
-                  'Session cookies to keep you logged in',
-                  'Local storage to save editor preferences and draft states',
+                  'A secure HttpOnly cookie (refresh token) to keep you signed in',
+                  'Browser session storage to hold your temporary login token and editor state',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5 text-[14px] text-[#4B5563]">
                     <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#3B82F6] flex-shrink-0" />
@@ -235,20 +237,47 @@ export default function TermsPage() {
               <p className="text-[14px] text-[#4B5563]">We do not use third-party tracking cookies or advertising cookies.</p>
             </section>
 
-            <section>
-              <h3 className="text-[16px] font-semibold text-[#111827] mb-2">5. Data Storage</h3>
-              <p className="text-[14px] text-[#4B5563] leading-relaxed">
-                Your data is stored on servers used to host this student project (such as cloud providers like Vercel, Render, or similar platforms). We take reasonable steps to keep your data secure, but as a student project, we cannot guarantee enterprise-level security. Please do not store highly sensitive personal information on CollabDocs.
+            <section id="pp-5">
+              <h3 className="text-[16px] font-semibold text-[#111827] mb-2">5. AI Features &amp; DeepSeek</h3>
+              <p className="text-[14px] text-[#4B5563] leading-relaxed mb-3">
+                CollabDocs offers optional AI writing tools (such as improve, summarize, fix grammar, expand, simplify, change tone, translate, outline, brainstorm, and generate titles). These features are only used when you explicitly trigger them.
+              </p>
+              <p className="text-[14px] text-[#4B5563] leading-relaxed mb-3">
+                When you use an AI tool, the specific text you submit for that action (for example, a selection or a document's content) is sent to our third-party AI provider, <span className="font-semibold">DeepSeek</span>, which processes it and returns a result. This means:
+              </p>
+              <ul className="space-y-2 mb-3">
+                {[
+                  'Only the text you choose to send for a given AI action leaves our servers — nothing is sent automatically or in the background',
+                  'Your submitted text is processed by DeepSeek under its own privacy policy and terms',
+                  'We do not send your account details, passwords, or other documents along with the request',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2.5 text-[14px] text-[#4B5563]">
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#3B82F6] flex-shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[14px] text-[#4B5563]">
+                If you prefer that your content never leaves CollabDocs, simply do not use the AI tools. Please review DeepSeek's privacy policy at{' '}
+                <a href="https://www.deepseek.com/privacy" target="_blank" rel="noopener noreferrer" className="text-[#3B82F6] hover:underline">deepseek.com/privacy</a>.
               </p>
             </section>
 
             <section>
-              <h3 className="text-[16px] font-semibold text-[#111827] mb-2">6. Data Sharing</h3>
+              <h3 className="text-[16px] font-semibold text-[#111827] mb-2">6. Data Storage</h3>
+              <p className="text-[14px] text-[#4B5563] leading-relaxed">
+                Your account and document data is stored in a MongoDB Atlas database, with the application hosted on cloud platforms used to run this student project. We take reasonable steps to keep your data secure, but as a student project, we cannot guarantee enterprise-level security. Please do not store highly sensitive personal information on CollabDocs.
+              </p>
+            </section>
+
+            <section>
+              <h3 className="text-[16px] font-semibold text-[#111827] mb-2">7. Data Sharing</h3>
               <p className="text-[14px] text-[#4B5563] leading-relaxed mb-3">We do not sell, rent, or share your personal data with third parties, except:</p>
               <ul className="space-y-2">
                 {[
                   'With other users when you share a document with them (only the content you choose to share)',
                   'With hosting/infrastructure providers strictly to operate the service',
+                  'With our AI provider (DeepSeek) when you use an AI writing tool — only the text you submit for that action (see section 5)',
                   'When required by law',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5 text-[14px] text-[#4B5563]">
@@ -259,8 +288,8 @@ export default function TermsPage() {
               </ul>
             </section>
 
-            <section id="pp-7">
-              <h3 className="text-[16px] font-semibold text-[#111827] mb-2">7. Your Rights</h3>
+            <section id="pp-8">
+              <h3 className="text-[16px] font-semibold text-[#111827] mb-2">8. Your Rights</h3>
               <p className="text-[14px] text-[#4B5563] leading-relaxed mb-3">You have the right to:</p>
               <ul className="space-y-2 mb-3">
                 {[
@@ -279,21 +308,21 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h3 className="text-[16px] font-semibold text-[#111827] mb-2">8. Data Retention</h3>
+              <h3 className="text-[16px] font-semibold text-[#111827] mb-2">9. Data Retention</h3>
               <p className="text-[14px] text-[#4B5563] leading-relaxed">
                 We keep your data for as long as your account is active. If you delete your account, we will delete your personal data and documents within 30 days, unless we are required by law to retain it longer.
               </p>
             </section>
 
             <section>
-              <h3 className="text-[16px] font-semibold text-[#111827] mb-2">9. Children's Privacy</h3>
+              <h3 className="text-[16px] font-semibold text-[#111827] mb-2">10. Children's Privacy</h3>
               <p className="text-[14px] text-[#4B5563] leading-relaxed">
                 CollabDocs is not directed at children under 13. We do not knowingly collect data from children under 13. If you believe a child under 13 has created an account, please contact us and we will delete it promptly.
               </p>
             </section>
 
             <section>
-              <h3 className="text-[16px] font-semibold text-[#111827] mb-2">10. Changes to This Policy</h3>
+              <h3 className="text-[16px] font-semibold text-[#111827] mb-2">11. Changes to This Policy</h3>
               <p className="text-[14px] text-[#4B5563] leading-relaxed">
                 We may update this privacy policy from time to time. We will notify you of significant changes via email or an in-app banner. The "Effective Date" at the top of this document will always reflect the latest version.
               </p>
@@ -310,7 +339,7 @@ export default function TermsPage() {
           <div className="space-y-2 text-[14px]">
             <div className="flex items-center gap-2">
               <span className="text-[#9CA3AF] w-20 flex-shrink-0 text-[13px]">Email</span>
-              <a href="mailto:erusumitkumar45@gmail.com" className="text-[#3B82F6] hover:underline">erusumitkumar45@gmail.com</a>
+              <a href="mailto:ersumitkumar45@gmail.com" className="text-[#3B82F6] hover:underline">ersumitkumar45@gmail.com</a>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[#9CA3AF] w-20 flex-shrink-0 text-[13px]">Project</span>
