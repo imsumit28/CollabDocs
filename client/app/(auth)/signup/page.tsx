@@ -2,6 +2,7 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '../../../contexts/AuthContext';
 
 type Step = 1 | 2 | 3 | 4;
@@ -416,7 +417,7 @@ export default function SignupPage() {
     <div className="flex min-h-screen">
       {/* ── Left panel ── */}
       <div className="hidden lg:flex lg:w-[44%] flex-col bg-[#111827] px-10 pt-12 pb-10">
-        <img src="/collabdocs-logo-full.png?v=2" alt="CollabDocs" className="h-14 w-auto object-contain rounded-xl self-start" />
+        <Image src="/collabdocs-logo-full.png?v=3" alt="CollabDocs" width={662} height={216} priority className="h-14 w-auto object-contain rounded-xl self-start" />
         <div className="flex-1 flex flex-col justify-center py-8">
           <OnboardingPreview step={step} workspaceName={workspaceName} />
         </div>
@@ -428,7 +429,7 @@ export default function SignupPage() {
         <div className="w-full max-w-[420px]">
           {/* Mobile logo */}
           <div className="mb-8 lg:hidden flex justify-center">
-            <img src="/collabdocs-logo-full.png?v=2" alt="CollabDocs" className="h-14 w-auto object-contain rounded-xl" />
+            <Image src="/collabdocs-logo-full.png?v=3" alt="CollabDocs" width={662} height={216} priority className="h-14 w-auto object-contain rounded-xl" />
           </div>
 
           {/* ── Step 1: Account creation ── */}

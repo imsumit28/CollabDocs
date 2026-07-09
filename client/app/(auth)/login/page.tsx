@@ -2,6 +2,7 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '../../../contexts/AuthContext';
 
 function EyeIcon({ open }: { open: boolean }) {
@@ -236,7 +237,7 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-[44%] flex-col bg-[#111827] px-10 pt-12 pb-10">
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <img src="/collabdocs-logo-full.png?v=2" alt="CollabDocs" className="h-14 w-auto object-contain rounded-xl" />
+          <Image src="/collabdocs-logo-full.png?v=3" alt="CollabDocs" width={662} height={216} priority className="h-14 w-auto object-contain rounded-xl" />
         </div>
 
         {/* Live preview centred vertically */}
@@ -253,7 +254,7 @@ export default function LoginPage() {
 
           {/* Mobile logo */}
           <div className="mb-10 lg:hidden flex justify-center">
-            <img src="/collabdocs-logo-full.png?v=2" alt="CollabDocs" className="h-12 w-auto object-contain" />
+            <Image src="/collabdocs-logo-full.png?v=3" alt="CollabDocs" width={662} height={216} priority className="h-12 w-auto object-contain" />
           </div>
 
           {/* Heading */}

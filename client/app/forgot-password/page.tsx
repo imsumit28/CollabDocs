@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect, FormEvent, KeyboardEvent, ClipboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { api } from '../../lib/api';
 
 type Step = 'email' | 'otp' | 'reset' | 'done';
@@ -163,7 +164,7 @@ function BrandPanel({ step }: { step: Step }) {
 
       {/* Logo */}
       <div className="relative flex items-center gap-3">
-        <img src="/collabdocs-logo-full.png?v=2" alt="CollabDocs" className="h-14 w-auto object-contain rounded-xl" />
+        <Image src="/collabdocs-logo-full.png?v=3" alt="CollabDocs" width={662} height={216} priority className="h-14 w-auto object-contain rounded-xl" />
       </div>
 
       {/* Centred content */}
@@ -361,7 +362,7 @@ export default function ForgotPasswordPage() {
 
           {/* Mobile logo */}
           <div className="mb-10 lg:hidden flex justify-center">
-            <img src="/collabdocs-logo-full.png?v=2" alt="CollabDocs" className="h-12 w-auto object-contain" />
+            <Image src="/collabdocs-logo-full.png?v=3" alt="CollabDocs" width={662} height={216} priority className="h-12 w-auto object-contain" />
           </div>
 
           {/* Compact step indicator (all breakpoints, hidden on success) */}

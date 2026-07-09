@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function TermsPage() {
   return (
@@ -8,7 +9,7 @@ export default function TermsPage() {
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
             <div className="rounded-xl bg-white p-1.5 shadow-sm border border-[rgba(0,0,0,0.08)] flex-shrink-0">
-              <img src="/collabdocs-logo-full.png" alt="CollabDocs" className="h-8 w-auto object-contain" />
+              <Image src="/collabdocs-logo-full.png" alt="CollabDocs" width={662} height={216} className="h-8 w-auto object-contain" />
             </div>
           </Link>
           <Link

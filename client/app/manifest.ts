@@ -13,7 +13,7 @@ export default function manifest(): MetadataRoute.Manifest {
     icons: [
       // SVG scales to any size — satisfies installability on modern browsers
       { src: '/favicon.svg?v=2', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
-      { src: '/favicon.png?v=2', sizes: '256x256', type: 'image/png' },
+      { src: '/favicon.png?v=4', sizes: '256x256', type: 'image/png' },
       { src: '/logo.png', sizes: '242x212', type: 'image/png' },
     ],
   };
