@@ -12,10 +12,10 @@ test.describe('Forgot password (OTP)', () => {
     await expect(page.getByRole('heading', { name: /forgot password/i })).toBeVisible();
 
     await page.getByPlaceholder('you@example.com').fill('jane@example.com');
-    await page.getByRole('button', { name: /send otp/i }).click();
+    await page.getByRole('button', { name: /send code/i }).click();
 
     await expect(page.getByRole('heading', { name: /enter the code/i })).toBeVisible();
-    await expect(page.getByText('jane@example.com')).toBeVisible();
+    await expect(page.getByText(/we sent a \d+-digit code to/i)).toBeVisible();
     await expect(page.getByRole('group', { name: /verification code/i })).toBeVisible();
   });
 
@@ -29,7 +29,7 @@ test.describe('Forgot password (OTP)', () => {
 
     await page.goto('/forgot-password');
     await page.getByPlaceholder('you@example.com').fill('google@example.com');
-    await page.getByRole('button', { name: /send otp/i }).click();
+    await page.getByRole('button', { name: /send code/i }).click();
 
     await expect(page.getByRole('heading', { name: /enter the code/i })).toBeVisible();
     await expect(page.getByRole('heading', { name: /use google to sign in/i })).toHaveCount(0);
