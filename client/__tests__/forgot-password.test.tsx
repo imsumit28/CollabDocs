@@ -10,7 +10,7 @@ const mockedPost = api.post as jest.Mock;
 
 async function submitEmail(email = 'me@example.com') {
   await userEvent.type(screen.getByPlaceholderText('you@example.com'), email);
-  await userEvent.click(screen.getByRole('button', { name: /send otp/i }));
+  await userEvent.click(screen.getByRole('button', { name: /send code/i }));
 }
 
 describe('ForgotPasswordPage', () => {
@@ -65,7 +65,7 @@ describe('ForgotPasswordPage', () => {
     for (let i = 0; i < 6; i++) {
       await userEvent.type(boxes[i], String(i + 1));
     }
-    await userEvent.click(screen.getByRole('button', { name: /verify otp/i }));
+    await userEvent.click(screen.getByRole('button', { name: /verify code/i }));
 
     await waitFor(() =>
       expect(mockedPost).toHaveBeenCalledWith('/auth/verify-otp', { email: 'me@example.com', otp: '123456' })

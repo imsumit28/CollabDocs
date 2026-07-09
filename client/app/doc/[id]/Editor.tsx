@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { useEditor, EditorContent, ReactRenderer, BubbleMenu } from '@tiptap/react';
 import { Mark, mergeAttributes } from '@tiptap/core';
@@ -405,6 +406,74 @@ function ToolbarPopover({ label, active, button, panelClassName, children }: {
   );
 }
 
+// Font-family picker — each option is rendered in its own typeface so users
+// can preview a font before applying it, instead of a plain-text <select>.
+function FontFamilyPicker({ editor }: { editor: any }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const current = editor.getAttributes('fontFamily').fontFamily || '';
+  const currentLabel = FONT_OPTIONS.find((f) => f.value === current)?.label || 'System';
+
+  // Rendered through a portal below, so the panel isn't clipped by the
+  // toolbar's horizontally-scrolling ancestor (overflow-x-auto forces
+  // overflow-y: auto too, per the CSS overflow spec).
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 6, left: r.left });
+    }
+    setOpen((v) => !v);
+  };
+
+  return (
+    <div className="relative flex-shrink-0">
+      <button
+        ref={btnRef}
+        type="button"
+        title="Font family"
+        onMouseDown={(e) => { e.preventDefault(); toggle(); }}
+        className={`h-[26px] w-[88px] flex items-center justify-between gap-1 rounded-[5px] text-[11px] text-[#3A3A3C] bg-white border px-1.5 outline-none cursor-pointer flex-shrink-0 transition-colors ${
+          open ? 'border-[#007AFF]' : 'border-[rgba(0,0,0,0.10)] hover:bg-[#EBEBEF] hover:border-[rgba(0,0,0,0.18)]'
+        }`}
+      >
+        <span className="truncate" style={{ fontFamily: current || undefined }}>{currentLabel}</span>
+        <svg className="w-2.5 h-2.5 flex-shrink-0 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 9l6 6 6-6" /></svg>
+      </button>
+      {open && pos && createPortal(
+        <>
+          <div className="fixed inset-0 z-40" onMouseDown={(e) => { e.preventDefault(); setOpen(false); }} />
+          <div
+            className="fixed z-50 bg-white rounded-[12px] shadow-apple-lg border border-[rgba(0,0,0,0.08)] p-1.5 anim-pop w-[220px] max-h-[320px] overflow-y-auto"
+            style={{ top: pos.top, left: pos.left }}
+            onMouseDown={(e) => e.preventDefault()}
+          >
+            {FONT_OPTIONS.map((f) => (
+              <button
+                key={f.label}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  if (f.value) editor.chain().focus().setFontFamily(f.value).run();
+                  else editor.chain().focus().unsetFontFamily().run();
+                  setOpen(false);
+                }}
+                className={`w-full text-left px-2 py-1.5 rounded-[6px] text-[13px] transition-colors duration-100 hover:bg-[#F5F5F7] ${
+                  current === f.value ? 'bg-[#EAF2FF] text-[#007AFF]' : 'text-[#1D1D1F]'
+                }`}
+                style={{ fontFamily: f.value || undefined }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </>,
+        document.body
+      )}
+    </div>
+  );
+}
+
 function userColor(userId: string): string {
   let hash = 0;
   for (let i = 0; i < userId.length; i++) hash = userId.charCodeAt(i) + ((hash << 5) - hash);
@@ -546,18 +615,7 @@ function Toolbar({
         {/* Group 3 — Font family & size */}
         <div className={`items-center gap-0.5 ${adv}`}>
           <Sep />
-          <select
-            title="Font family"
-            value={editor.getAttributes('fontFamily').fontFamily || ''}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v) editor.chain().focus().setFontFamily(v).run();
-              else editor.chain().focus().unsetFontFamily().run();
-            }}
-            className="h-[26px] w-[88px] rounded-[5px] text-[11px] text-[#3A3A3C] bg-white border border-[rgba(0,0,0,0.10)] hover:bg-[#EBEBEF] hover:border-[rgba(0,0,0,0.18)] px-1 outline-none cursor-pointer flex-shrink-0 transition-colors appearance-none truncate"
-          >
-            {FONT_OPTIONS.map((f) => <option key={f.label} value={f.value}>{f.label}</option>)}
-          </select>
+          <FontFamilyPicker editor={editor} />
           <select
             title="Font size"
             value={editor.getAttributes('fontSize').fontSize || ''}
