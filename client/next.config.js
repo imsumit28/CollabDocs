@@ -9,9 +9,13 @@ const nextConfig = {
       { protocol: 'https', hostname: 'res.cloudinary.com' },
     ],
   },
-  // Tree-shake icon/barrel imports so unused exports don't ship to the client.
   experimental: {
+    // Tree-shake icon/barrel imports so unused exports don't ship to the client.
     optimizePackageImports: ['lucide-react'],
+    // Cap build worker parallelism: on low-RAM dev machines, multiple
+    // concurrent Jest workers can OOM mid-build ("Jest worker encountered
+    // N child process exceptions"), silently dropping pages from the build.
+    cpus: 1,
   },
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
