@@ -20,10 +20,10 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/favicon.png?v=3', type: 'image/png', sizes: '256x256' },
+      { url: '/favicon.png?v=4', type: 'image/png', sizes: '256x256' },
     ],
-    apple: '/favicon.png?v=3',
-    shortcut: '/favicon.png?v=3',
+    apple: '/favicon.png?v=4',
+    shortcut: '/favicon.png?v=4',
   },
   appleWebApp: {
     capable: true,
@@ -33,6 +33,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
   themeColor: '#2563EB',
 };
 

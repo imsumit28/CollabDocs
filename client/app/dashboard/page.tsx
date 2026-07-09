@@ -543,16 +543,42 @@ function ContextMenu({
   }, [onClose]);
 
   useLayoutEffect(() => {
-    if (!desktopMenuRef.current) return;
-    const rect = desktopMenuRef.current.getBoundingClientRect();
-    const top = anchor.bottom + 4 + rect.height > window.innerHeight - 8
-      ? Math.max(8, anchor.top - rect.height - 4)
-      : anchor.bottom + 4;
+    const el = desktopMenuRef.current;
+    if (!el) return;
+    const MARGIN = 8; // keep off the viewport edges
+    const GAP = 4;    // gap between anchor and menu
+    // Natural (unconstrained) menu height — style has no maxHeight at measure time
+    const menuHeight = el.scrollHeight;
+    const spaceBelow = window.innerHeight - anchor.bottom - GAP - MARGIN;
+    const spaceAbove = anchor.top - GAP - MARGIN;
+
+    let top: number;
+    let maxHeight: number;
+    if (menuHeight <= spaceBelow) {
+      // Fits fully below the button (default / current desktop behavior)
+      top = anchor.bottom + GAP;
+      maxHeight = spaceBelow;
+    } else if (menuHeight <= spaceAbove) {
+      // Doesn't fit below but fits fully above → flip upward
+      top = anchor.top - GAP - menuHeight;
+      maxHeight = spaceAbove;
+    } else {
+      // Taller than either side → open toward the roomier side and let it scroll
+      if (spaceBelow >= spaceAbove) {
+        top = anchor.bottom + GAP;
+        maxHeight = spaceBelow;
+      } else {
+        maxHeight = spaceAbove;
+        top = anchor.top - GAP - maxHeight;
+      }
+    }
     setStyle({
       position: 'fixed',
-      top,
+      top: Math.max(MARGIN, top),
       right: window.innerWidth - anchor.right,
       zIndex: 9999,
+      maxHeight,
+      overflowY: 'auto',
       visibility: 'visible',
     });
   }, [anchor]);
@@ -561,7 +587,7 @@ function ContextMenu({
     icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean; disabled?: boolean;
   }) => (
     <button type="button" onClick={onClick} disabled={disabled}
-      className={`flex items-center gap-2.5 w-full px-4 py-2.5 text-[14px] font-medium transition-colors text-left rounded-md
+      className={`flex items-center gap-2.5 w-full px-4 py-3 md:py-2.5 text-[14px] font-medium transition-colors text-left rounded-md
         ${danger ? 'text-[#FF3B30] hover:bg-[#FFF2F1] active:bg-[#FFE8E6]' : 'text-[#1D1D1F] hover:bg-[#F5F5F7] active:bg-[#EBEBEF]'}
         ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
       <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">{icon}</span>
@@ -603,7 +629,7 @@ function ContextMenu({
       <div>
         <button type="button"
           onClick={() => setExportOpen((v) => !v)}
-          className={`flex items-center gap-2.5 w-full px-4 py-2.5 text-[14px] font-medium transition-colors text-left rounded-md text-[#1D1D1F] hover:bg-[#F5F5F7] active:bg-[#EBEBEF]`}
+          className={`flex items-center gap-2.5 w-full px-4 py-3 md:py-2.5 text-[14px] font-medium transition-colors text-left rounded-md text-[#1D1D1F] hover:bg-[#F5F5F7] active:bg-[#EBEBEF]`}
         >
           <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
@@ -613,11 +639,11 @@ function ContextMenu({
         {exportOpen && (
           <div className="ml-3 border-l-2 border-[#2563EB]/20 pl-2 mb-1">
             <button type="button" onClick={() => { onExport('pdf'); onClose(); }}
-              className="flex items-center gap-2 w-full px-3 py-1.5 text-[12px] text-[#1D1D1F] hover:bg-[#F5F5F7] active:bg-[#E8E8ED] rounded-lg transition-colors">
+              className="flex items-center gap-2 w-full px-3 py-2 md:py-1.5 text-[12px] text-[#1D1D1F] hover:bg-[#F5F5F7] active:bg-[#E8E8ED] rounded-lg transition-colors">
               <span className="text-[10px] font-bold bg-[#FF3B30] text-white px-1 rounded">PDF</span> Export as PDF
             </button>
             <button type="button" onClick={() => { onExport('docx'); onClose(); }}
-              className="flex items-center gap-2 w-full px-3 py-1.5 text-[12px] text-[#1D1D1F] hover:bg-[#F5F5F7] active:bg-[#E8E8ED] rounded-lg transition-colors">
+              className="flex items-center gap-2 w-full px-3 py-2 md:py-1.5 text-[12px] text-[#1D1D1F] hover:bg-[#F5F5F7] active:bg-[#E8E8ED] rounded-lg transition-colors">
               <span className="text-[10px] font-bold bg-[#2563EB] text-white px-1 rounded">DOC</span> Export as DOCX
             </button>
           </div>
@@ -2381,6 +2407,7 @@ export default function DashboardPage() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
+                aria-label="Sort documents"
                 className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 bg-white border border-[rgba(0,0,0,0.08)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 min-w-0"
               >
                 <option value="lastEdited">Last edited</option>
@@ -2392,6 +2419,7 @@ export default function DashboardPage() {
               <select
                 value={filterBy}
                 onChange={(e) => setFilterBy(e.target.value as any)}
+                aria-label="Filter documents"
                 className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 bg-white border border-[rgba(0,0,0,0.08)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 min-w-0"
               >
                 <option value="all">All documents</option>

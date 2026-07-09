@@ -1,6 +1,6 @@
 // CollabDocs service worker — app-shell offline support.
 // Bump CACHE_VERSION to invalidate old caches on deploy.
-const CACHE_VERSION = 'collabdocs-v1';
+const CACHE_VERSION = 'collabdocs-v2';
 const OFFLINE_URL = '/offline.html';
 
 const PRECACHE = [OFFLINE_URL, '/favicon.svg', '/favicon.png'];
